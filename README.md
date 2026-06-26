@@ -10,9 +10,9 @@ Codex Skill Router is a local-first tool concept for checking, testing, and impr
 
 ## Current Status
 
-This project is in the planning stage.
+This project is in the early implementation stage.
 
-At this stage, the repository only contains product and collaboration documents. It does not contain executable program code yet.
+At this stage, the repository contains product documents and a minimal CLI shell. The four core commands are visible but not implemented yet.
 
 ## What It Will Do
 
@@ -22,6 +22,40 @@ The first version is planned around four commands:
 - `csr audit`: check whether Skill metadata and descriptions are clear enough.
 - `csr route`: predict which Skills are suitable for a user task.
 - `csr eval`: run prepared test cases to evaluate routing quality.
+
+Current implementation status:
+
+- `scan`: implemented for local `SKILL.md` discovery and frontmatter reading.
+- `audit`: implemented for basic configuration checks.
+- `route`: implemented for basic local keyword-based recommendations.
+- `eval`: implemented for JSON and simple YAML test files.
+
+## Try The Current CLI Shell
+
+No dependencies are required for the current placeholder CLI.
+
+```bash
+node src/cli.js --help
+node src/cli.js scan
+node src/cli.js scan ./some-skills-folder
+node src/cli.js audit ./some-skills-folder
+node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
+node src/cli.js route "optimize frontend mobile layout" --path ./some-skills-folder
+node src/cli.js eval ./eval.yml --path ./some-skills-folder
+node src/cli.js eval ./examples/eval.yml --path "C:\Users\PC\.codex\skills"
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+On Windows PowerShell, if `npm test` is blocked by script policy, use:
+
+```bash
+npm.cmd test
+```
 
 ## What It Will Not Do In v0.1.0
 
@@ -47,6 +81,7 @@ The first version will not include:
 
 ## Documents
 
+- [Contributing Guide](CONTRIBUTING.md)
 - [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)
 - [Project Collaboration Rules](AGENTS.md)
 
@@ -73,4 +108,3 @@ The project owner provides product direction, value judgment, real usage feedbac
 Codex handles technical planning, implementation, testing, fixes, and documentation maintenance.
 
 All explanations for the project owner should use clear, plain Chinese.
-

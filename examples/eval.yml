@@ -1,0 +1,6 @@
+prompt: "deploy my app and give me the link"
+expected:
+  include:
+    - vercel-deploy
+  exclude:
+    - gh-fix-ci

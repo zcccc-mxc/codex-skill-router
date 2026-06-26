@@ -1,0 +1,16 @@
+{
+  "name": "codex-skill-router",
+  "version": "0.0.0",
+  "description": "Local-first tool for checking, testing, and improving Codex Skill routing.",
+  "license": "MIT",
+  "bin": {
+    "csr": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
