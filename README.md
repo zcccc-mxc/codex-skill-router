@@ -43,6 +43,7 @@ node src/cli.js scan --hide-paths ./some-skills-folder
 node src/cli.js scan --json --hide-paths ./some-skills-folder
 node src/cli.js scan --brief --hide-paths ./some-skills-folder
 node src/cli.js audit ./some-skills-folder
+node src/cli.js audit --severity warning --path ./some-skills-folder
 node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
 node src/cli.js route "optimize frontend mobile layout" --path ./some-skills-folder
 node src/cli.js eval ./eval.yml --path ./some-skills-folder

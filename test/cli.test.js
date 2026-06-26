@@ -14,6 +14,19 @@ function run(args) {
   });
 }
 
+function runFailure(args) {
+  try {
+    run(args);
+  } catch (error) {
+    return {
+      status: error.status,
+      output: `${error.stdout || ""}${error.stderr || ""}`,
+    };
+  }
+
+  throw new Error("Expected command to fail.");
+}
+
 test("prints help", () => {
   const output = run(["--help"]);
   assert.match(output, /Codex Skill Router/);
@@ -243,6 +256,54 @@ description: Use when testing duplicate skill names with enough detail.
   const output = run(["audit", tempRoot]);
 
   assert.match(output, /Skill 名称重复/);
+});
+
+test("filters audit issues by severity", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-audit-severity-"));
+  const missingDir = path.join(tempRoot, "missing-description");
+  const shortDir = path.join(tempRoot, "short-description");
+  fs.mkdirSync(missingDir, { recursive: true });
+  fs.mkdirSync(shortDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(missingDir, "SKILL.md"),
+    `---
+name: missing-description
+---
+
+# Missing Description
+`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(shortDir, "SKILL.md"),
+    `---
+name: short-description
+description: Helper.
+---
+
+# Short Description
+`,
+    "utf8",
+  );
+
+  const errorOutput = run(["audit", "--severity", "error", "--path", tempRoot]);
+  const warningOutput = run(["audit", "--severity", "warning", tempRoot]);
+
+  assert.match(errorOutput, /\[error\]/);
+  assert.match(errorOutput, /missing-description/);
+  assert.doesNotMatch(errorOutput, /\[warning\]/);
+  assert.doesNotMatch(errorOutput, /short-description/);
+  assert.match(warningOutput, /\[warning\]/);
+  assert.match(warningOutput, /short-description/);
+  assert.doesNotMatch(warningOutput, /\[error\]/);
+  assert.doesNotMatch(warningOutput, /missing-description/);
+});
+
+test("rejects invalid audit severity", () => {
+  const result = runFailure(["audit", "--severity", "critical"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.output, /Unknown audit severity: critical/);
 });
 
 test("routes a task to matching skills", () => {

@@ -119,7 +119,23 @@ function hideScanPaths(result) {
   };
 }
 
-function printAuditResult(result) {
+const AUDIT_SEVERITIES = new Set(["error", "warning", "info"]);
+
+function filterAuditResult(result, severity) {
+  if (!severity) {
+    return result;
+  }
+
+  const issues = result.issues.filter((item) => item.severity === severity);
+
+  return {
+    ...result,
+    visibleIssueCount: issues.length,
+    issues,
+  };
+}
+
+function printAuditResult(result, options = {}) {
   console.log("csr audit");
   console.log("");
   console.log(`检查 Skills: ${result.skillCount}`);
@@ -127,10 +143,19 @@ function printAuditResult(result) {
   console.log(`严重问题: ${result.errorCount}`);
   console.log(`建议修复: ${result.warningCount}`);
   console.log(`提示信息: ${result.infoCount}`);
+  if (options.severity) {
+    console.log(`筛选级别: ${options.severity}`);
+    console.log(`显示问题: ${result.visibleIssueCount}`);
+  }
   console.log("");
 
   if (result.issueCount === 0) {
     console.log("没有发现明显问题。");
+    return;
+  }
+
+  if (options.severity && result.issues.length === 0) {
+    console.log("没有符合筛选条件的问题。");
     return;
   }
 
@@ -142,6 +167,47 @@ function printAuditResult(result) {
     console.log(`  路径: ${item.path}`);
     console.log("");
   }
+}
+
+function parseAuditArgs(args) {
+  const paths = [];
+  let severity = "";
+  let error = "";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+
+    if (value === "--severity") {
+      const nextValue = args[index + 1];
+      if (!nextValue) {
+        error = "audit --severity needs one of: error, warning, info.";
+        continue;
+      }
+
+      if (!AUDIT_SEVERITIES.has(nextValue)) {
+        error = `Unknown audit severity: ${nextValue}. Use: error, warning, info.`;
+        index += 1;
+        continue;
+      }
+
+      severity = nextValue;
+      index += 1;
+      continue;
+    }
+
+    if (value === "--path" || value === "-p") {
+      const nextValue = args[index + 1];
+      if (nextValue) {
+        paths.push(nextValue);
+        index += 1;
+      }
+      continue;
+    }
+
+    paths.push(value);
+  }
+
+  return { paths, severity, error };
 }
 
 function printRouteInputError() {
@@ -311,7 +377,14 @@ function main(argv = process.argv.slice(2)) {
   }
 
   if (command === "audit") {
-    printAuditResult(auditSkills(scanSkills({ paths: rest })));
+    const auditArgs = parseAuditArgs(rest);
+    if (auditArgs.error) {
+      console.error(auditArgs.error);
+      return 1;
+    }
+
+    const result = auditSkills(scanSkills({ paths: auditArgs.paths }));
+    printAuditResult(filterAuditResult(result, auditArgs.severity), { severity: auditArgs.severity });
     return 0;
   }
 
