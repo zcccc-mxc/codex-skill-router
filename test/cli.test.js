@@ -138,6 +138,30 @@ description: Use when testing hidden json path output.
   assert.equal(parsed.skills[0].path, "(已隐藏)");
 });
 
+test("prints brief scan output without descriptions", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-brief-"));
+  const skillDir = path.join(tempRoot, "brief-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: brief-skill
+description: Use when testing brief output.
+---
+
+# Brief Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", "--brief", tempRoot]);
+
+  assert.match(output, /brief-skill/);
+  assert.match(output, /状态: 正常/);
+  assert.doesNotMatch(output, /描述:/);
+  assert.doesNotMatch(output, /Use when testing brief output/);
+});
+
 test("reads folded multiline descriptions", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-folded-"));
   const skillDir = path.join(tempRoot, "folded-skill");

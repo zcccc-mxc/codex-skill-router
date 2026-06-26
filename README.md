@@ -12,7 +12,7 @@ Codex Skill Router is a local-first tool concept for checking, testing, and impr
 
 This project is in the early implementation stage.
 
-At this stage, the repository contains product documents and a minimal CLI shell. The four core commands are visible but not implemented yet.
+At this stage, the repository contains product documents and a minimal CLI. The four core commands have basic local-first implementations.
 
 ## What It Will Do
 
@@ -32,7 +32,7 @@ Current implementation status:
 
 ## Try The Current CLI Shell
 
-No dependencies are required for the current placeholder CLI.
+No dependencies are required for the current CLI.
 
 ```bash
 node src/cli.js --help
@@ -41,6 +41,7 @@ node src/cli.js scan ./some-skills-folder
 node src/cli.js scan --json ./some-skills-folder
 node src/cli.js scan --hide-paths ./some-skills-folder
 node src/cli.js scan --json --hide-paths ./some-skills-folder
+node src/cli.js scan --brief --hide-paths ./some-skills-folder
 node src/cli.js audit ./some-skills-folder
 node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
 node src/cli.js route "optimize frontend mobile layout" --path ./some-skills-folder

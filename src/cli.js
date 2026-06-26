@@ -44,7 +44,7 @@ function printPlaceholder(command, input) {
   后续会用一个独立开发步骤实现该命令，并补充测试。`);
 }
 
-function printScanResult(result) {
+function printScanResult(result, options = {}) {
   console.log("csr scan");
   console.log("");
   console.log("摘要:");
@@ -63,12 +63,15 @@ function printScanResult(result) {
 
   for (const skill of result.skills) {
     console.log(`- ${skill.name || "(未命名 Skill)"}`);
-    console.log(`  描述: ${skill.description || "(缺少 description)"}`);
     console.log(`  来源: ${skill.source}`);
     console.log(`  路径: ${skill.path}`);
     console.log(`  状态: ${skill.status === "ok" ? "正常" : "格式错误"}`);
 
-    if (skill.message) {
+    if (!options.brief) {
+      console.log(`  描述: ${skill.description || "(缺少 description)"}`);
+    }
+
+    if (!options.brief && skill.message) {
       console.log(`  提示: ${skill.message}`);
     }
 
@@ -80,6 +83,7 @@ function parseScanArgs(args) {
   const paths = [];
   let json = false;
   let hidePaths = false;
+  let brief = false;
 
   for (const value of args) {
     if (value === "--json") {
@@ -92,10 +96,15 @@ function parseScanArgs(args) {
       continue;
     }
 
+    if (value === "--brief") {
+      brief = true;
+      continue;
+    }
+
     paths.push(value);
   }
 
-  return { paths, json, hidePaths };
+  return { paths, json, hidePaths, brief };
 }
 
 function hideScanPaths(result) {
@@ -297,7 +306,7 @@ function main(argv = process.argv.slice(2)) {
       return 0;
     }
 
-    printScanResult(result);
+    printScanResult(result, { brief: scanArgs.brief });
     return 0;
   }
 

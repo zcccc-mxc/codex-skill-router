@@ -19,6 +19,7 @@ This project has not published a stable release yet.
 - Implemented `csr eval` for JSON and simple YAML route test files.
 - Improved `csr scan` with summary counts and JSON output.
 - Added `csr scan --hide-paths` to avoid showing local filesystem paths in shared output.
+- Added `csr scan --brief` for compact scan output.
 - Added `examples/eval.yml` as a small evaluation example.
 - Added Node.js built-in tests for the core CLI behavior.
 
