@@ -47,6 +47,8 @@ description: Use when testing the scan command.
   const output = run(["scan", tempRoot]);
 
   assert.match(output, /找到 Skills: 1/);
+  assert.match(output, /正常: 1/);
+  assert.match(output, /格式错误: 0/);
   assert.match(output, /sample-skill/);
   assert.match(output, /Use when testing the scan command/);
   assert.match(output, /来源: custom/);
@@ -62,8 +64,78 @@ test("marks malformed skill files", () => {
   const output = run(["scan", tempRoot]);
 
   assert.match(output, /找到 Skills: 1/);
+  assert.match(output, /格式错误: 1/);
   assert.match(output, /格式错误/);
   assert.match(output, /缺少 YAML frontmatter/);
+});
+
+test("prints scan results as json", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-json-"));
+  const skillDir = path.join(tempRoot, "json-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: json-skill
+description: Use when testing json scan output.
+---
+
+# JSON Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", "--json", tempRoot]);
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.summary.total, 1);
+  assert.equal(parsed.summary.ok, 1);
+  assert.equal(parsed.skills[0].name, "json-skill");
+});
+
+test("hides paths from scan text output", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-hide-"));
+  const skillDir = path.join(tempRoot, "hidden-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: hidden-skill
+description: Use when testing hidden path output.
+---
+
+# Hidden Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", "--hide-paths", tempRoot]);
+
+  assert.match(output, /路径: \(已隐藏\)/);
+  assert.doesNotMatch(output, new RegExp(tempRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("hides paths from scan json output", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-json-hide-"));
+  const skillDir = path.join(tempRoot, "hidden-json-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: hidden-json-skill
+description: Use when testing hidden json path output.
+---
+
+# Hidden JSON Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", "--json", "--hide-paths", tempRoot]);
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.roots[0], "(已隐藏)");
+  assert.equal(parsed.skills[0].path, "(已隐藏)");
 });
 
 test("reads folded multiline descriptions", () => {

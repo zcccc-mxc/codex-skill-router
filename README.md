@@ -38,6 +38,9 @@ No dependencies are required for the current placeholder CLI.
 node src/cli.js --help
 node src/cli.js scan
 node src/cli.js scan ./some-skills-folder
+node src/cli.js scan --json ./some-skills-folder
+node src/cli.js scan --hide-paths ./some-skills-folder
+node src/cli.js scan --json --hide-paths ./some-skills-folder
 node src/cli.js audit ./some-skills-folder
 node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
 node src/cli.js route "optimize frontend mobile layout" --path ./some-skills-folder

@@ -175,7 +175,17 @@ function scanSkills(options = {}) {
 
   skills.sort((left, right) => left.path.localeCompare(right.path));
 
+  const summary = {
+    roots: roots.length,
+    missingRoots: missingRoots.length,
+    total: skills.length,
+    ok: skills.filter((skill) => skill.status === "ok").length,
+    formatErrors: skills.filter((skill) => skill.status === "format-error").length,
+    readErrors: skills.filter((skill) => skill.status === "read-error").length,
+  };
+
   return {
+    summary,
     roots: roots.map((item) => item.root),
     missingRoots,
     skills,

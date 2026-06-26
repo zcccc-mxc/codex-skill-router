@@ -17,6 +17,8 @@ This project has not published a stable release yet.
 - Implemented `csr audit` for basic Skill configuration checks.
 - Implemented `csr route` for local keyword-based routing prediction.
 - Implemented `csr eval` for JSON and simple YAML route test files.
+- Improved `csr scan` with summary counts and JSON output.
+- Added `csr scan --hide-paths` to avoid showing local filesystem paths in shared output.
 - Added `examples/eval.yml` as a small evaluation example.
 - Added Node.js built-in tests for the core CLI behavior.
 
@@ -40,4 +42,3 @@ This project has not published a stable release yet.
 Planned first release.
 
 Release criteria are documented in [docs/PRODUCT_REQUIREMENTS.md](docs/PRODUCT_REQUIREMENTS.md).
-

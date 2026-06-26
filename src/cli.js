@@ -47,17 +47,19 @@ function printPlaceholder(command, input) {
 function printScanResult(result) {
   console.log("csr scan");
   console.log("");
-  console.log(`扫描位置: ${result.roots.length}`);
+  console.log("摘要:");
+  console.log(`  扫描位置: ${result.summary.roots}`);
+  console.log(`  缺失位置: ${result.summary.missingRoots}`);
+  console.log(`  找到 Skills: ${result.summary.total}`);
+  console.log(`  正常: ${result.summary.ok}`);
+  console.log(`  格式错误: ${result.summary.formatErrors}`);
+  console.log(`  读取失败: ${result.summary.readErrors}`);
+  console.log("");
 
   if (result.skills.length === 0) {
-    console.log("找到 Skills: 0");
-    console.log("");
     console.log("没有找到可扫描的 Skills。请确认当前目录或用户 Skills 目录是否存在。");
     return;
   }
-
-  console.log(`找到 Skills: ${result.skills.length}`);
-  console.log("");
 
   for (const skill of result.skills) {
     console.log(`- ${skill.name || "(未命名 Skill)"}`);
@@ -72,6 +74,40 @@ function printScanResult(result) {
 
     console.log("");
   }
+}
+
+function parseScanArgs(args) {
+  const paths = [];
+  let json = false;
+  let hidePaths = false;
+
+  for (const value of args) {
+    if (value === "--json") {
+      json = true;
+      continue;
+    }
+
+    if (value === "--hide-paths") {
+      hidePaths = true;
+      continue;
+    }
+
+    paths.push(value);
+  }
+
+  return { paths, json, hidePaths };
+}
+
+function hideScanPaths(result) {
+  return {
+    ...result,
+    roots: result.roots.map(() => "(已隐藏)"),
+    missingRoots: result.missingRoots.map(() => "(已隐藏)"),
+    skills: result.skills.map((skill) => ({
+      ...skill,
+      path: "(已隐藏)",
+    })),
+  };
 }
 
 function printAuditResult(result) {
@@ -252,7 +288,16 @@ function main(argv = process.argv.slice(2)) {
   }
 
   if (command === "scan") {
-    printScanResult(scanSkills({ paths: rest }));
+    const scanArgs = parseScanArgs(rest);
+    const rawResult = scanSkills({ paths: scanArgs.paths });
+    const result = scanArgs.hidePaths ? hideScanPaths(rawResult) : rawResult;
+
+    if (scanArgs.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
+
+    printScanResult(result);
     return 0;
   }
 
