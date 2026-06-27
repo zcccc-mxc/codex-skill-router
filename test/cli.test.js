@@ -481,6 +481,50 @@ description: Use when running Playwright checks for UI rendering.
   assert.match(output, /语义理解/);
 });
 
+test("routes understands simple english word forms", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-route-word-forms-"));
+  const deployDir = path.join(tempRoot, "deploy-skill");
+  fs.mkdirSync(deployDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(deployDir, "SKILL.md"),
+    `---
+name: deploy-skill
+description: Use when deploying apps and publishing releases.
+---
+
+# Deploy Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["route", "deploy app release", "--path", tempRoot]);
+
+  assert.match(output, /deploy-skill/);
+  assert.match(output, /deploy/);
+});
+
+test("routes understands phrase-level concepts", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-route-phrases-"));
+  const browserDir = path.join(tempRoot, "browser-validation");
+  fs.mkdirSync(browserDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(browserDir, "SKILL.md"),
+    `---
+name: browser-validation
+description: Use when checking page rendering and browser validation results.
+---
+
+# Browser Validation
+`,
+    "utf8",
+  );
+
+  const output = run(["route", "verify browser rendering", "--path", tempRoot]);
+
+  assert.match(output, /browser-validation/);
+  assert.match(output, /短语理解/);
+});
+
 test("evaluates route cases from json", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-"));
   const skillDir = path.join(tempRoot, "deploy-skill");

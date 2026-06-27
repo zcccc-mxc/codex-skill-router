@@ -1,4 +1,4 @@
-const { tokenize } = require("./text");
+const { normalizeText, tokenize } = require("./text");
 
 const BROAD_TERMS = [
   "anything",
@@ -50,6 +50,29 @@ const DESCRIPTION_CONCEPTS = [
   },
 ];
 
+const PHRASE_CONCEPTS = [
+  {
+    label: "移动端布局",
+    phrases: ["mobile layout", "mobile display", "responsive layout", "responsive ui"],
+  },
+  {
+    label: "浏览器渲染验证",
+    phrases: ["browser rendering", "page rendering", "playwright checks", "browser validation"],
+  },
+  {
+    label: "文档编辑",
+    phrases: ["documentation pages", "editing guides", "docs clearer", "write docs"],
+  },
+  {
+    label: "部署链接",
+    phrases: ["deployment link", "deploy app", "release app", "publish app"],
+  },
+  {
+    label: "数据库结构变更",
+    phrases: ["database schema", "schema migration", "database migration"],
+  },
+];
+
 function countMatches(taskTerms, skillTerms) {
   const matchedTerms = [];
 
@@ -66,6 +89,18 @@ function matchDescriptionConcepts(taskTerms, descriptionTerms) {
   return DESCRIPTION_CONCEPTS.filter((concept) => {
     const taskMatched = concept.terms.some((term) => taskTerms.has(term));
     const descriptionMatched = concept.terms.some((term) => descriptionTerms.has(term));
+
+    return taskMatched && descriptionMatched;
+  }).map((concept) => concept.label);
+}
+
+function matchPhraseConcepts(task, description) {
+  const normalizedTask = normalizeText(task);
+  const normalizedDescription = normalizeText(description);
+
+  return PHRASE_CONCEPTS.filter((concept) => {
+    const taskMatched = concept.phrases.some((phrase) => normalizedTask.includes(phrase));
+    const descriptionMatched = concept.phrases.some((phrase) => normalizedDescription.includes(phrase));
 
     return taskMatched && descriptionMatched;
   }).map((concept) => concept.label);
@@ -100,6 +135,7 @@ function scoreSkill(task, skill) {
         nameMatches: [],
         descriptionMatches: [],
         semanticMatches: [],
+        phraseMatches: [],
         exclusionMatches: [],
         broadPenalty: 0,
       },
@@ -114,6 +150,7 @@ function scoreSkill(task, skill) {
   const nameMatches = countMatches(taskTerms, nameTerms);
   const descriptionMatches = countMatches(taskTerms, descriptionTerms);
   const semanticMatches = matchDescriptionConcepts(taskTerms, descriptionTerms);
+  const phraseMatches = matchPhraseConcepts(task, skill.description || "");
   const exclusionMatches = countMatches(taskTerms, exclusionTerms);
   const matchedTerms = [...new Set([...nameMatches, ...descriptionMatches])];
   const broadPenalty = hasBroadDescription(skill.description) ? 1 : 0;
@@ -121,7 +158,8 @@ function scoreSkill(task, skill) {
   const rawScore =
     nameMatches.length * 3 +
     descriptionMatches.length +
-    semanticMatches.length * 2 -
+    semanticMatches.length * 2 +
+    phraseMatches.length * 3 -
     exclusionMatches.length * 4 -
     broadPenalty;
   const score = Math.max(0, rawScore);
@@ -137,6 +175,10 @@ function scoreSkill(task, skill) {
 
   if (semanticMatches.length > 0) {
     reasons.push(`语义理解：${semanticMatches.join(", ")}。`);
+  }
+
+  if (phraseMatches.length > 0) {
+    reasons.push(`短语理解：${phraseMatches.join(", ")}。`);
   }
 
   if (exclusionMatches.length > 0) {
@@ -159,6 +201,7 @@ function scoreSkill(task, skill) {
       nameMatches,
       descriptionMatches,
       semanticMatches,
+      phraseMatches,
       exclusionMatches,
       broadPenalty,
     },

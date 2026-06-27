@@ -106,19 +106,51 @@ function normalizeText(text) {
   return text.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, " ").trim();
 }
 
+function stemAsciiToken(token) {
+  if (token.length > 6 && token.endsWith("ing")) {
+    return token.slice(0, -3);
+  }
+
+  if (token.length > 5 && token.endsWith("ied")) {
+    return `${token.slice(0, -3)}y`;
+  }
+
+  if (token.length > 5 && token.endsWith("ed")) {
+    return token.slice(0, -2);
+  }
+
+  if (token.length > 5 && token.endsWith("es")) {
+    return token.slice(0, -2);
+  }
+
+  if (token.length > 4 && token.endsWith("s")) {
+    return token.slice(0, -1);
+  }
+
+  return token;
+}
+
+function expandAsciiToken(token) {
+  const stemmed = stemAsciiToken(token);
+  const values = [token, stemmed, ...(ASCII_SYNONYMS[token] || []), ...(ASCII_SYNONYMS[stemmed] || [])];
+
+  return [...new Set(values)];
+}
+
 function tokenize(text) {
   const normalized = normalizeText(text);
   const asciiTokens = normalized.match(/[a-z0-9]{3,}/g) || [];
   const cjkTokens = normalized.match(/[\u4e00-\u9fa5]{2,}/g) || [];
   const cjkKeywordTokens = CJK_KEYWORDS.filter((keyword) => normalized.includes(keyword));
   const synonymTokens = cjkKeywordTokens.flatMap((keyword) => CJK_SYNONYMS[keyword] || []);
-  const asciiSynonymTokens = asciiTokens.flatMap((token) => ASCII_SYNONYMS[token] || []);
-  const tokens = [...asciiTokens, ...asciiSynonymTokens, ...cjkTokens, ...cjkKeywordTokens, ...synonymTokens];
+  const asciiExpandedTokens = asciiTokens.flatMap(expandAsciiToken);
+  const tokens = [...asciiExpandedTokens, ...cjkTokens, ...cjkKeywordTokens, ...synonymTokens];
 
   return [...new Set(tokens.filter((token) => !STOP_WORDS.has(token)))];
 }
 
 module.exports = {
   normalizeText,
+  stemAsciiToken,
   tokenize,
 };
