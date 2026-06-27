@@ -37,16 +37,16 @@ No dependencies are required for the current CLI.
 ```bash
 node src/cli.js --help
 node src/cli.js scan
-node src/cli.js scan ./some-skills-folder
-node src/cli.js scan --path ./some-skills-folder
-node src/cli.js scan --json ./some-skills-folder
-node src/cli.js scan --show-paths ./some-skills-folder
-node src/cli.js scan --json --show-paths ./some-skills-folder
-node src/cli.js scan --brief ./some-skills-folder
-node src/cli.js audit ./some-skills-folder
-node src/cli.js audit --severity warning --path ./some-skills-folder
+node src/cli.js scan ./examples/skills
+node src/cli.js scan --path ./examples/skills
+node src/cli.js scan --json ./examples/skills
+node src/cli.js scan --show-paths ./examples/skills
+node src/cli.js scan --json --show-paths ./examples/skills
+node src/cli.js scan --brief ./examples/skills
+node src/cli.js audit ./examples/skills
+node src/cli.js audit --severity warning --path ./examples/skills
 node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
-node src/cli.js route "optimize frontend mobile layout" --path ./some-skills-folder
+node src/cli.js route "optimize frontend mobile layout" --path ./examples/skills
 node src/cli.js eval ./examples/eval.yml --path ./examples/skills
 node src/cli.js eval ./examples/eval.yml --json --path ./examples/skills
 node src/cli.js eval ./examples/eval.yml --min-complete-rate 1 --path ./examples/skills
@@ -55,6 +55,16 @@ node src/cli.js eval ./examples/eval.yml --min-complete-rate 1 --path ./examples
 Path privacy: CLI output hides local filesystem paths by default, including common local path fragments inside Skill descriptions. Use `--show-paths` only when you intentionally need full paths for local debugging.
 
 The repository sample Eval file contains 30 routing tasks and uses only the public sample Skills under `examples/skills`.
+
+To test the package-style `csr` command locally:
+
+```bash
+npm link
+csr --help
+csr eval ./examples/eval.yml --path ./examples/skills --min-complete-rate 1
+```
+
+Use `npm unlink -g codex-skill-router` when you no longer need the linked command.
 
 Run tests:
 
@@ -105,8 +115,8 @@ The first release should only happen after:
 - `route` can recommend Skills with explanations;
 - `eval` can run a test set;
 - core tests pass;
-- type checks pass;
-- build passes;
+- CI runs on GitHub Actions;
+- package-style `csr` command works through `npm link`;
 - README examples are executable;
 - no secrets or private paths are committed;
 - at least one demo sample exists;

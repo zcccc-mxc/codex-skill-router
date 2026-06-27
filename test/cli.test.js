@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { similarity } = require("../src/audit");
 const { routeTask } = require("../src/route");
 
 const cliPath = path.join(__dirname, "..", "src", "cli.js");
@@ -338,6 +339,15 @@ description: Use when testing duplicate skill names with enough detail.
   assert.match(output, /Skill 名称重复/);
 });
 
+test("audit overlap ignores exclusion text", () => {
+  const score = similarity(
+    "Use when editing README documentation. Do not use for browser rendering checks.",
+    "Use when changing database schema. Do not use for browser rendering checks.",
+  );
+
+  assert.ok(score < 0.45);
+});
+
 test("filters audit issues by severity", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-audit-severity-"));
   const missingDir = path.join(tempRoot, "missing-description");
@@ -620,6 +630,23 @@ test("routes do not recommend skills from generic check words only", () => {
 
   assert.deepEqual(result.recommended, []);
   assert.equal(result.notRecommended[0].skill.name, "ci-debug");
+});
+
+test("routes do not count exclusion text as positive evidence", () => {
+  const result = routeTask("create illustration images", {
+    skills: [
+      {
+        name: "database-migration",
+        description: "Use when changing database schema and SQL indexes. Do not use for image generation or illustration tasks.",
+        path: "database-migration/SKILL.md",
+        source: "custom",
+        status: "ok",
+      },
+    ],
+  });
+
+  assert.deepEqual(result.recommended, []);
+  assert.equal(result.notRecommended[0].skill.name, "database-migration");
 });
 
 test("evaluates route cases from json", () => {

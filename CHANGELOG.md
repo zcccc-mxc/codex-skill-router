@@ -26,10 +26,13 @@ This project has not published a stable release yet.
 - Improved `csr route` description understanding with English synonyms and semantic concept hints.
 - Improved `csr route` matching with simple English stemming and phrase-level concept detection.
 - Reduced `csr route` false positives from generic check, test, review, validation, browser, page, and data terms.
+- Reduced false positives by preventing exclusion text from being counted as positive route evidence.
+- Reduced audit overlap false positives by comparing applicability text separately from exclusion text.
 - Added `csr eval --json` for machine-readable evaluation results.
 - Added `csr eval --min-complete-rate` to fail evaluation runs below a required complete rate.
 - Added optional expectation handling for `csr eval`.
 - Added `examples/eval.yml` with 30 reproducible routing tasks and public sample Skills under `examples/skills`.
+- Added GitHub Actions CI for Node.js tests on Linux, Windows, and macOS.
 - Added Node.js built-in tests for the core CLI behavior.
 
 ### Safety Notes

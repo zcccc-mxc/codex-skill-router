@@ -12,9 +12,31 @@ const BROAD_PHRASES = [
 
 const { normalizeText, tokenize } = require("./text");
 
+const EXCLUSION_MARKERS = [
+  "do not use",
+  "not use",
+  "avoid",
+  "not for",
+  "涓嶈",
+  "涓嶉€傜敤",
+  "閬垮厤",
+  "涓嶈鐢ㄤ簬",
+];
+
+function extractApplicabilityText(description) {
+  const normalized = description.toLowerCase();
+  const markerIndexes = EXCLUSION_MARKERS.map((marker) => normalized.indexOf(marker)).filter((index) => index >= 0);
+
+  if (markerIndexes.length === 0) {
+    return description;
+  }
+
+  return description.slice(0, Math.min(...markerIndexes));
+}
+
 function similarity(left, right) {
-  const leftTokens = new Set(tokenize(left));
-  const rightTokens = new Set(tokenize(right));
+  const leftTokens = new Set(tokenize(extractApplicabilityText(left)));
+  const rightTokens = new Set(tokenize(extractApplicabilityText(right)));
 
   if (leftTokens.size === 0 || rightTokens.size === 0) {
     return 0;

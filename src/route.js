@@ -134,6 +134,17 @@ function extractExclusionText(description) {
   return parts.join(" ");
 }
 
+function extractApplicabilityText(description) {
+  const normalized = description.toLowerCase();
+  const markerIndexes = EXCLUSION_MARKERS.map((marker) => normalized.indexOf(marker)).filter((index) => index >= 0);
+
+  if (markerIndexes.length === 0) {
+    return description;
+  }
+
+  return description.slice(0, Math.min(...markerIndexes));
+}
+
 function hasBroadDescription(description) {
   const normalized = description.toLowerCase();
   return BROAD_TERMS.some((term) => normalized.includes(term));
@@ -159,13 +170,14 @@ function scoreSkill(task, skill) {
 
   const taskTerms = new Set(tokenize(task));
   const nameTerms = new Set(tokenize(skill.name || ""));
-  const descriptionTerms = new Set(tokenize(skill.description || ""));
+  const applicabilityText = extractApplicabilityText(skill.description || "");
+  const descriptionTerms = new Set(tokenize(applicabilityText));
   const exclusionTerms = new Set(tokenize(extractExclusionText(skill.description || "")));
   const nameMatches = countMatches(taskTerms, nameTerms);
   const descriptionMatches = countMatches(taskTerms, descriptionTerms);
   const semanticMatches = matchDescriptionConcepts(taskTerms, descriptionTerms);
-  const phraseMatches = matchPhraseConcepts(task, skill.description || "");
-  const exclusionMatches = countMatches(taskTerms, exclusionTerms);
+  const phraseMatches = matchPhraseConcepts(task, applicabilityText);
+  const exclusionMatches = countMatches(taskTerms, exclusionTerms).filter((term) => !GENERIC_ROUTE_TERMS.has(term));
   const matchedTerms = [...new Set([...nameMatches, ...descriptionMatches])];
   const concreteNameMatches = nameMatches.filter((term) => !GENERIC_ROUTE_TERMS.has(term));
   const concreteMatches = matchedTerms.filter((term) => !GENERIC_ROUTE_TERMS.has(term));
@@ -233,6 +245,7 @@ function scoreSkill(task, skill) {
 
 function routeTask(task, scanResult, options = {}) {
   const limit = options.limit || 3;
+  const minScore = options.minScore || 2;
   const scored = (scanResult.skills || [])
     .map((skill) => scoreSkill(task, skill))
     .sort((left, right) => {
@@ -243,8 +256,8 @@ function routeTask(task, scanResult, options = {}) {
       return left.skill.path.localeCompare(right.skill.path);
     });
 
-  const recommended = scored.filter((item) => item.score > 0).slice(0, limit);
-  const notRecommended = scored.filter((item) => item.score === 0).slice(0, limit);
+  const recommended = scored.filter((item) => item.score >= minScore).slice(0, limit);
+  const notRecommended = scored.filter((item) => item.score < minScore).slice(0, limit);
 
   return {
     task,
