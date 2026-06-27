@@ -295,6 +295,27 @@ function parsePathArgs(args) {
   return { paths, rest };
 }
 
+function parseEvalArgs(args) {
+  const parsed = parsePathArgs(args);
+  const rest = [];
+  let json = false;
+
+  for (const value of parsed.rest) {
+    if (value === "--json") {
+      json = true;
+      continue;
+    }
+
+    rest.push(value);
+  }
+
+  return {
+    paths: parsed.paths,
+    rest,
+    json,
+  };
+}
+
 function printEvalInputError() {
   console.error(`csr eval 需要一个测试文件路径。
 
@@ -400,7 +421,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   if (command === "eval") {
-    const evalArgs = parsePathArgs(rest);
+    const evalArgs = parseEvalArgs(rest);
     const evalFile = evalArgs.rest[0];
     if (!evalFile) {
       printEvalInputError();
@@ -409,7 +430,13 @@ function main(argv = process.argv.slice(2)) {
 
     try {
       const cases = loadEvalCases(evalFile);
-      printEvalResult(evaluateRoutes(cases, scanSkills({ paths: evalArgs.paths })));
+      const result = evaluateRoutes(cases, scanSkills({ paths: evalArgs.paths }));
+      if (evalArgs.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return 0;
+      }
+
+      printEvalResult(result);
       return 0;
     } catch (error) {
       console.error(`无法运行 eval: ${error.message}`);

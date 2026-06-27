@@ -23,6 +23,7 @@ This project has not published a stable release yet.
 - Added `csr audit --severity` to focus on error, warning, or info issues.
 - Improved `csr route` scoring with name matches, description matches, exclusion penalties, and broad-description penalties.
 - Improved `csr route` description understanding with English synonyms and semantic concept hints.
+- Added `csr eval --json` for machine-readable evaluation results.
 - Added `examples/eval.yml` as a small evaluation example.
 - Added Node.js built-in tests for the core CLI behavior.
 

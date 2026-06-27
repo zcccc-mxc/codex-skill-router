@@ -520,6 +520,47 @@ description: Use when deploying an app and creating a deployment link.
   assert.match(output, /必须调用 Skill 命中率: 100%/);
 });
 
+test("evaluates route cases as json output", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-json-output-"));
+  const skillDir = path.join(tempRoot, "deploy-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: deploy-skill
+description: Use when deploying an app and creating a deployment link.
+---
+
+# Deploy Skill
+`,
+    "utf8",
+  );
+
+  const evalFile = path.join(tempRoot, "eval.json");
+  fs.writeFileSync(
+    evalFile,
+    JSON.stringify([
+      {
+        prompt: "deploy app link",
+        expected: {
+          include: ["deploy-skill"],
+          exclude: ["database-skill"],
+        },
+      },
+    ]),
+    "utf8",
+  );
+
+  const output = run(["eval", evalFile, "--json", "--path", tempRoot]);
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.total, 1);
+  assert.equal(parsed.complete, 1);
+  assert.equal(parsed.includeHitRate, 1);
+  assert.equal(parsed.excludeCorrectRate, 1);
+  assert.deepEqual(parsed.results[0].recommended, ["deploy-skill"]);
+});
+
 test("evaluates route cases from simple yaml", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-yaml-"));
   const skillDir = path.join(tempRoot, "browser-validation");
