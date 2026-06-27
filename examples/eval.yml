@@ -1,6 +1,220 @@
-prompt: "deploy my app and give me the link"
+prompt: "optimize frontend mobile layout"
 expected:
   include:
-    - vercel-deploy
+    - frontend-ui
   exclude:
-    - gh-fix-ci
+    - database-migration
+
+prompt: "improve existing page visual hierarchy"
+expected:
+  include:
+    - frontend-ui
+  exclude:
+    - security-review
+
+prompt: "check mobile page rendering in browser"
+expected:
+  include:
+    - browser-validation
+  optional:
+    - frontend-ui
+  exclude:
+    - database-migration
+
+prompt: "validate Playwright screenshot flow"
+expected:
+  include:
+    - browser-validation
+  exclude:
+    - docs-authoring
+
+prompt: "review login authorization bypass risk"
+expected:
+  include:
+    - security-review
+  exclude:
+    - frontend-ui
+
+prompt: "check API access control permissions"
+expected:
+  include:
+    - security-review
+  exclude:
+    - docs-authoring
+
+prompt: "only update README installation instructions"
+expected:
+  include:
+    - docs-authoring
+  exclude:
+    - deploy-skill
+
+prompt: "write usage guide documentation"
+expected:
+  include:
+    - docs-authoring
+  exclude:
+    - security-review
+
+prompt: "deploy app and give me the release link"
+expected:
+  include:
+    - deploy-skill
+  exclude:
+    - database-migration
+
+prompt: "publish release and verify deployment output"
+expected:
+  include:
+    - deploy-skill
+  optional:
+    - browser-validation
+  exclude:
+    - image-generation
+
+prompt: "analyze ecommerce product risk using sales metrics"
+expected:
+  include:
+    - data-analysis
+  exclude:
+    - frontend-ui
+
+prompt: "compare market trends from dataset"
+expected:
+  include:
+    - data-analysis
+  exclude:
+    - deploy-skill
+
+prompt: "generate product photo visual assets"
+expected:
+  include:
+    - image-generation
+  exclude:
+    - security-review
+
+prompt: "create illustration concept images"
+expected:
+  include:
+    - image-generation
+  exclude:
+    - database-migration
+
+prompt: "review GitHub pull request comments"
+expected:
+  include:
+    - github-review
+  exclude:
+    - image-generation
+
+prompt: "inspect CI failure context in repository"
+expected:
+  include:
+    - github-review
+  exclude:
+    - frontend-ui
+
+prompt: "change database schema and SQL indexes"
+expected:
+  include:
+    - database-migration
+  exclude:
+    - frontend-ui
+
+prompt: "add migration for data model structure"
+expected:
+  include:
+    - database-migration
+  exclude:
+    - browser-validation
+
+prompt: "refactor modules without changing behavior"
+expected:
+  include:
+    - code-refactor
+  exclude:
+    - deploy-skill
+
+prompt: "reduce code duplication and improve maintainability"
+expected:
+  include:
+    - code-refactor
+  exclude:
+    - image-generation
+
+prompt: "build page from screenshot and check mobile viewport"
+expected:
+  include:
+    - frontend-ui
+    - browser-validation
+  exclude:
+    - database-migration
+
+prompt: "deploy app then validate browser rendering"
+expected:
+  include:
+    - deploy-skill
+    - browser-validation
+  exclude:
+    - docs-authoring
+
+prompt: "review API security and update README notes"
+expected:
+  include:
+    - security-review
+    - docs-authoring
+  exclude:
+    - image-generation
+
+prompt: "analyze sales data and publish release summary"
+expected:
+  include:
+    - data-analysis
+    - deploy-skill
+  exclude:
+    - database-migration
+
+prompt: "make it better"
+expected:
+  include:
+  exclude:
+    - frontend-ui
+    - security-review
+
+prompt: "organize my files"
+expected:
+  include:
+  exclude:
+    - deploy-skill
+    - database-migration
+
+prompt: "check something"
+expected:
+  include:
+  exclude:
+    - github-review
+    - browser-validation
+
+prompt: "fix the thing from yesterday"
+expected:
+  include:
+  exclude:
+    - code-refactor
+    - security-review
+
+prompt: "write changelog for repository changes"
+expected:
+  include:
+    - docs-authoring
+  optional:
+    - github-review
+  exclude:
+    - image-generation
+
+prompt: "create product image and compare market risk"
+expected:
+  include:
+    - image-generation
+    - data-analysis
+  exclude:
+    - database-migration

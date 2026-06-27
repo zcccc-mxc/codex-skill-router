@@ -29,6 +29,54 @@ function printHelp() {
   所有真实功能都会坚持本地优先、默认只读。`);
 }
 
+function printCommandHelp(command) {
+  const helpText = {
+    scan: `csr scan
+
+用法:
+  csr scan [路径]
+  csr scan --path <路径>
+
+选项:
+  --json        输出 JSON。
+  --brief       隐藏 description，输出更短。
+  --show-paths  显示本地路径；默认隐藏。
+  --hide-paths  兼容选项；默认已经隐藏路径。`,
+    audit: `csr audit
+
+用法:
+  csr audit [路径]
+  csr audit --path <路径>
+
+选项:
+  --severity <error|warning|info>  只显示指定级别的问题。
+  --show-paths                    显示本地路径；默认隐藏。`,
+    route: `csr route
+
+用法:
+  csr route "任务描述"
+  csr route "任务描述" --path <路径>
+
+选项:
+  --show-paths  显示本地路径；默认隐藏。`,
+    eval: `csr eval
+
+用法:
+  csr eval <测试文件>
+  csr eval <测试文件> --path <路径>
+
+选项:
+  --json                       输出 JSON。
+  --min-complete-rate <0..1>   完全正确率低于阈值时返回失败。`,
+  };
+
+  console.log(helpText[command]);
+}
+
+function hasHelpArg(args) {
+  return args.includes("-h") || args.includes("--help");
+}
+
 function printPlaceholder(command, input) {
   const inputLine = input.length > 0 ? `\n输入: ${input.join(" ")}` : "";
 
@@ -82,17 +130,24 @@ function printScanResult(result, options = {}) {
 function parseScanArgs(args) {
   const paths = [];
   let json = false;
-  let hidePaths = false;
+  let showPaths = false;
   let brief = false;
 
-  for (const value of args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+
     if (value === "--json") {
       json = true;
       continue;
     }
 
     if (value === "--hide-paths") {
-      hidePaths = true;
+      showPaths = false;
+      continue;
+    }
+
+    if (value === "--show-paths") {
+      showPaths = true;
       continue;
     }
 
@@ -101,13 +156,28 @@ function parseScanArgs(args) {
       continue;
     }
 
+    if (value === "--path" || value === "-p") {
+      const nextValue = args[index + 1];
+      if (nextValue) {
+        paths.push(nextValue);
+        index += 1;
+      }
+      continue;
+    }
+
     paths.push(value);
   }
 
-  return { paths, json, hidePaths, brief };
+  return { paths, json, showPaths, brief };
 }
 
 function hideScanPaths(result) {
+  function redactLocalPaths(value) {
+    return String(value || "")
+      .replace(/[A-Za-z]:\\[^\s"',)]+/g, "(hidden path)")
+      .replace(/\/(?:Users|home)\/[^\s"',)]+/g, "(hidden path)");
+  }
+
   return {
     ...result,
     roots: result.roots.map(() => "(已隐藏)"),
@@ -115,6 +185,8 @@ function hideScanPaths(result) {
     skills: result.skills.map((skill) => ({
       ...skill,
       path: "(已隐藏)",
+      description: redactLocalPaths(skill.description),
+      message: redactLocalPaths(skill.message),
     })),
   };
 }
@@ -173,9 +245,15 @@ function parseAuditArgs(args) {
   const paths = [];
   let severity = "";
   let error = "";
+  let showPaths = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
+
+    if (value === "--show-paths") {
+      showPaths = true;
+      continue;
+    }
 
     if (value === "--severity") {
       const nextValue = args[index + 1];
@@ -207,7 +285,7 @@ function parseAuditArgs(args) {
     paths.push(value);
   }
 
-  return { paths, severity, error };
+  return { paths, severity, error, showPaths };
 }
 
 function printRouteInputError() {
@@ -220,9 +298,15 @@ function printRouteInputError() {
 function parseRouteArgs(args) {
   const paths = [];
   const taskParts = [];
+  let showPaths = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
+
+    if (value === "--show-paths") {
+      showPaths = true;
+      continue;
+    }
 
     if (value === "--path" || value === "-p") {
       const nextValue = args[index + 1];
@@ -239,6 +323,7 @@ function parseRouteArgs(args) {
   return {
     task: taskParts.join(" ").trim(),
     paths,
+    showPaths,
   };
 }
 
@@ -299,10 +384,28 @@ function parseEvalArgs(args) {
   const parsed = parsePathArgs(args);
   const rest = [];
   let json = false;
+  let minCompleteRate = null;
+  let error = "";
 
-  for (const value of parsed.rest) {
+  for (let index = 0; index < parsed.rest.length; index += 1) {
+    const value = parsed.rest[index];
+
     if (value === "--json") {
       json = true;
+      continue;
+    }
+
+    if (value === "--min-complete-rate") {
+      const nextValue = parsed.rest[index + 1];
+      const parsedValue = Number(nextValue);
+
+      if (!nextValue || Number.isNaN(parsedValue) || parsedValue < 0 || parsedValue > 1) {
+        error = "eval --min-complete-rate needs a number from 0 to 1.";
+        continue;
+      }
+
+      minCompleteRate = parsedValue;
+      index += 1;
       continue;
     }
 
@@ -313,6 +416,8 @@ function parseEvalArgs(args) {
     paths: parsed.paths,
     rest,
     json,
+    minCompleteRate,
+    error,
   };
 }
 
@@ -358,6 +463,10 @@ function printEvalResult(result) {
   }
 }
 
+function evalCompleteRate(result) {
+  return result.total === 0 ? 0 : result.complete / result.total;
+}
+
 function main(argv = process.argv.slice(2)) {
   const [command, ...rest] = argv;
 
@@ -378,6 +487,11 @@ function main(argv = process.argv.slice(2)) {
     return 1;
   }
 
+  if (hasHelpArg(rest)) {
+    printCommandHelp(command);
+    return 0;
+  }
+
   if (command === "route" && rest.length === 0) {
     printRouteInputError();
     return 1;
@@ -386,7 +500,7 @@ function main(argv = process.argv.slice(2)) {
   if (command === "scan") {
     const scanArgs = parseScanArgs(rest);
     const rawResult = scanSkills({ paths: scanArgs.paths });
-    const result = scanArgs.hidePaths ? hideScanPaths(rawResult) : rawResult;
+    const result = scanArgs.showPaths ? rawResult : hideScanPaths(rawResult);
 
     if (scanArgs.json) {
       console.log(JSON.stringify(result, null, 2));
@@ -404,7 +518,8 @@ function main(argv = process.argv.slice(2)) {
       return 1;
     }
 
-    const result = auditSkills(scanSkills({ paths: auditArgs.paths }));
+    const scanResult = scanSkills({ paths: auditArgs.paths });
+    const result = auditSkills(auditArgs.showPaths ? scanResult : hideScanPaths(scanResult));
     printAuditResult(filterAuditResult(result, auditArgs.severity), { severity: auditArgs.severity });
     return 0;
   }
@@ -416,12 +531,18 @@ function main(argv = process.argv.slice(2)) {
       return 1;
     }
 
-    printRouteResult(routeTask(routeArgs.task, scanSkills({ paths: routeArgs.paths })));
+    const scanResult = scanSkills({ paths: routeArgs.paths });
+    printRouteResult(routeTask(routeArgs.task, routeArgs.showPaths ? scanResult : hideScanPaths(scanResult)));
     return 0;
   }
 
   if (command === "eval") {
     const evalArgs = parseEvalArgs(rest);
+    if (evalArgs.error) {
+      console.error(evalArgs.error);
+      return 1;
+    }
+
     const evalFile = evalArgs.rest[0];
     if (!evalFile) {
       printEvalInputError();
@@ -433,10 +554,17 @@ function main(argv = process.argv.slice(2)) {
       const result = evaluateRoutes(cases, scanSkills({ paths: evalArgs.paths }));
       if (evalArgs.json) {
         console.log(JSON.stringify(result, null, 2));
-        return 0;
+        return evalArgs.minCompleteRate === null || evalCompleteRate(result) >= evalArgs.minCompleteRate ? 0 : 1;
       }
 
       printEvalResult(result);
+      if (evalArgs.minCompleteRate !== null && evalCompleteRate(result) < evalArgs.minCompleteRate) {
+        console.error(
+          `eval complete rate ${formatPercent(evalCompleteRate(result))} is below required ${formatPercent(evalArgs.minCompleteRate)}.`,
+        );
+        return 1;
+      }
+
       return 0;
     } catch (error) {
       console.error(`无法运行 eval: ${error.message}`);

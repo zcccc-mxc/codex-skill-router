@@ -30,7 +30,7 @@ const DESCRIPTION_CONCEPTS = [
   },
   {
     label: "浏览器验证",
-    terms: ["browser", "playwright", "rendering", "screenshot", "validate", "validation", "verify"],
+    terms: ["browser", "playwright", "rendering", "screenshot"],
   },
   {
     label: "移动端界面",
@@ -49,6 +49,20 @@ const DESCRIPTION_CONCEPTS = [
     terms: ["audit", "check", "review", "test", "validate", "validation", "verify"],
   },
 ];
+
+const GENERIC_ROUTE_TERMS = new Set([
+  "audit",
+  "check",
+  "data",
+  "review",
+  "test",
+  "testing",
+  "validate",
+  "validation",
+  "verify",
+]);
+
+const GENERIC_SEMANTIC_LABELS = new Set([DESCRIPTION_CONCEPTS[5].label]);
 
 const PHRASE_CONCEPTS = [
   {
@@ -153,6 +167,9 @@ function scoreSkill(task, skill) {
   const phraseMatches = matchPhraseConcepts(task, skill.description || "");
   const exclusionMatches = countMatches(taskTerms, exclusionTerms);
   const matchedTerms = [...new Set([...nameMatches, ...descriptionMatches])];
+  const concreteNameMatches = nameMatches.filter((term) => !GENERIC_ROUTE_TERMS.has(term));
+  const concreteMatches = matchedTerms.filter((term) => !GENERIC_ROUTE_TERMS.has(term));
+  const concreteSemanticMatches = semanticMatches.filter((label) => !GENERIC_SEMANTIC_LABELS.has(label));
   const broadPenalty = hasBroadDescription(skill.description) ? 1 : 0;
 
   const rawScore =
@@ -162,7 +179,12 @@ function scoreSkill(task, skill) {
     phraseMatches.length * 3 -
     exclusionMatches.length * 4 -
     broadPenalty;
-  const score = Math.max(0, rawScore);
+  const hasReliableEvidence =
+    concreteMatches.length > 0 ||
+    concreteNameMatches.length > 0 ||
+    concreteSemanticMatches.length > 0 ||
+    phraseMatches.length > 0;
+  const score = hasReliableEvidence ? Math.max(0, rawScore) : 0;
   const reasons = [];
 
   if (nameMatches.length > 0) {

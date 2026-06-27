@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { routeTask } = require("../src/route");
 
 const cliPath = path.join(__dirname, "..", "src", "cli.js");
 
@@ -34,6 +35,15 @@ test("prints help", () => {
   assert.match(output, /audit/);
   assert.match(output, /route/);
   assert.match(output, /eval/);
+});
+
+test("prints command help", () => {
+  const output = run(["scan", "--help"]);
+
+  assert.match(output, /csr scan/);
+  assert.match(output, /--path/);
+  assert.match(output, /--show-paths/);
+  assert.doesNotMatch(output, /找到 Skills:/);
 });
 
 test("prints version", () => {
@@ -68,6 +78,53 @@ description: Use when testing the scan command.
   assert.match(output, /状态: 正常/);
 });
 
+test("shows paths from scan text output when requested", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-show-"));
+  const skillDir = path.join(tempRoot, "shown-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: shown-skill
+description: Use when testing explicit path output.
+---
+
+# Shown Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", "--show-paths", tempRoot]);
+
+  assert.match(output, /shown-skill/);
+  assert.match(output, new RegExp(tempRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("scans skill files with --path option", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-path-option-"));
+  const skillDir = path.join(tempRoot, "path-option-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: path-option-skill
+description: Use when testing scan path option support.
+---
+
+# Path Option Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", "--json", "--show-paths", "--path", tempRoot]);
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.summary.roots, 1);
+  assert.equal(parsed.summary.missingRoots, 0);
+  assert.equal(parsed.summary.total, 1);
+  assert.equal(parsed.skills[0].name, "path-option-skill");
+});
+
 test("marks malformed skill files", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-bad-"));
   const skillDir = path.join(tempRoot, "bad-skill");
@@ -98,7 +155,7 @@ description: Use when testing json scan output.
     "utf8",
   );
 
-  const output = run(["scan", "--json", tempRoot]);
+  const output = run(["scan", "--json", "--show-paths", tempRoot]);
   const parsed = JSON.parse(output);
 
   assert.equal(parsed.summary.total, 1);
@@ -128,6 +185,29 @@ description: Use when testing hidden path output.
   assert.doesNotMatch(output, new RegExp(tempRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
+test("redacts local paths inside scan descriptions by default", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-redact-description-"));
+  const skillDir = path.join(tempRoot, "path-description-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: path-description-skill
+description: Use when reading files from C:\\Users\\Someone\\private\\tool.
+---
+
+# Path Description Skill
+`,
+    "utf8",
+  );
+
+  const output = run(["scan", tempRoot]);
+
+  assert.match(output, /path-description-skill/);
+  assert.match(output, /\(hidden path\)/);
+  assert.doesNotMatch(output, /C:\\Users\\Someone/);
+});
+
 test("hides paths from scan json output", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-json-hide-"));
   const skillDir = path.join(tempRoot, "hidden-json-skill");
@@ -144,7 +224,7 @@ description: Use when testing hidden json path output.
     "utf8",
   );
 
-  const output = run(["scan", "--json", "--hide-paths", tempRoot]);
+  const output = run(["scan", "--json", tempRoot]);
   const parsed = JSON.parse(output);
 
   assert.equal(parsed.roots[0], "(已隐藏)");
@@ -525,6 +605,23 @@ description: Use when checking page rendering and browser validation results.
   assert.match(output, /短语理解/);
 });
 
+test("routes do not recommend skills from generic check words only", () => {
+  const result = routeTask("check login authorization bypass", {
+    skills: [
+      {
+        name: "ci-debug",
+        description: "Use when debugging failing GitHub Actions checks and test runs.",
+        path: "ci-debug/SKILL.md",
+        source: "custom",
+        status: "ok",
+      },
+    ],
+  });
+
+  assert.deepEqual(result.recommended, []);
+  assert.equal(result.notRecommended[0].skill.name, "ci-debug");
+});
+
 test("evaluates route cases from json", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-"));
   const skillDir = path.join(tempRoot, "deploy-skill");
@@ -550,6 +647,7 @@ description: Use when deploying an app and creating a deployment link.
         expected: {
           include: ["deploy-skill"],
           exclude: ["database-skill"],
+          optional: ["docs-skill"],
         },
       },
     ]),
@@ -602,7 +700,62 @@ description: Use when deploying an app and creating a deployment link.
   assert.equal(parsed.complete, 1);
   assert.equal(parsed.includeHitRate, 1);
   assert.equal(parsed.excludeCorrectRate, 1);
+  assert.deepEqual(parsed.results[0].optionalHits, []);
   assert.deepEqual(parsed.results[0].recommended, ["deploy-skill"]);
+});
+
+test("eval fails when complete rate is below threshold", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-threshold-"));
+  const skillDir = path.join(tempRoot, "deploy-skill");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: deploy-skill
+description: Use when deploying an app and creating a deployment link.
+---
+
+# Deploy Skill
+`,
+    "utf8",
+  );
+
+  const evalFile = path.join(tempRoot, "eval.json");
+  fs.writeFileSync(
+    evalFile,
+    JSON.stringify([
+      {
+        prompt: "deploy app link",
+        expected: {
+          include: ["missing-skill"],
+          exclude: [],
+        },
+      },
+    ]),
+    "utf8",
+  );
+
+  const result = runFailure(["eval", evalFile, "--path", tempRoot, "--min-complete-rate", "1"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.output, /below required/);
+});
+
+test("eval rejects invalid complete rate threshold", () => {
+  const result = runFailure(["eval", "examples/eval.yml", "--min-complete-rate", "2"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.output, /min-complete-rate/);
+});
+
+test("example eval file has thirty reproducible cases", () => {
+  const output = run(["eval", "examples/eval.yml", "--json", "--path", "examples/skills"]);
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.total, 30);
+  assert.equal(parsed.complete, 30);
+  assert.equal(parsed.includeHitRate, 1);
+  assert.equal(parsed.excludeCorrectRate, 1);
 });
 
 test("evaluates route cases from simple yaml", () => {

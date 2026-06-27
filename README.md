@@ -28,7 +28,7 @@ Current implementation status:
 - `scan`: implemented for local `SKILL.md` discovery and frontmatter reading.
 - `audit`: implemented for basic configuration checks.
 - `route`: implemented for local recommendations with explainable scoring, basic description understanding, and phrase-level matching.
-- `eval`: implemented for JSON and simple YAML test files.
+- `eval`: implemented for JSON and simple YAML test files, including include, exclude, optional, and threshold checks.
 
 ## Try The Current CLI Shell
 
@@ -38,18 +38,23 @@ No dependencies are required for the current CLI.
 node src/cli.js --help
 node src/cli.js scan
 node src/cli.js scan ./some-skills-folder
+node src/cli.js scan --path ./some-skills-folder
 node src/cli.js scan --json ./some-skills-folder
-node src/cli.js scan --hide-paths ./some-skills-folder
-node src/cli.js scan --json --hide-paths ./some-skills-folder
-node src/cli.js scan --brief --hide-paths ./some-skills-folder
+node src/cli.js scan --show-paths ./some-skills-folder
+node src/cli.js scan --json --show-paths ./some-skills-folder
+node src/cli.js scan --brief ./some-skills-folder
 node src/cli.js audit ./some-skills-folder
 node src/cli.js audit --severity warning --path ./some-skills-folder
 node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
 node src/cli.js route "optimize frontend mobile layout" --path ./some-skills-folder
-node src/cli.js eval ./eval.yml --path ./some-skills-folder
-node src/cli.js eval ./eval.yml --json --path ./some-skills-folder
-node src/cli.js eval ./examples/eval.yml --path "C:\Users\PC\.codex\skills"
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills
+node src/cli.js eval ./examples/eval.yml --json --path ./examples/skills
+node src/cli.js eval ./examples/eval.yml --min-complete-rate 1 --path ./examples/skills
 ```
+
+Path privacy: CLI output hides local filesystem paths by default, including common local path fragments inside Skill descriptions. Use `--show-paths` only when you intentionally need full paths for local debugging.
+
+The repository sample Eval file contains 30 routing tasks and uses only the public sample Skills under `examples/skills`.
 
 Run tests:
 

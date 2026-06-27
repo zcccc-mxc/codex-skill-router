@@ -54,6 +54,7 @@ function parseSimpleYaml(content) {
         expected: {
           include: [],
           exclude: [],
+          optional: [],
         },
       };
       continue;
@@ -73,6 +74,13 @@ function parseSimpleYaml(content) {
     if (/^exclude:\s*$/.test(trimmed)) {
       const parsed = parseYamlList(lines, index + 1);
       current.expected.exclude = parsed.values;
+      index = parsed.nextIndex - 1;
+      continue;
+    }
+
+    if (/^optional:\s*$/.test(trimmed)) {
+      const parsed = parseYamlList(lines, index + 1);
+      current.expected.optional = parsed.values;
       index = parsed.nextIndex - 1;
     }
   }
@@ -107,6 +115,7 @@ function loadEvalCases(filePath) {
       expected: {
         include: Array.isArray(expected.include) ? expected.include : [],
         exclude: Array.isArray(expected.exclude) ? expected.exclude : [],
+        optional: Array.isArray(expected.optional) ? expected.optional : [],
       },
     };
   });
@@ -117,6 +126,7 @@ function evaluateRoutes(cases, scanResult) {
     const routeResult = routeTask(testCase.prompt, scanResult);
     const recommendedNames = routeResult.recommended.map((item) => item.skill.name);
     const includeHits = testCase.expected.include.filter((name) => recommendedNames.includes(name));
+    const optionalHits = testCase.expected.optional.filter((name) => recommendedNames.includes(name));
     const missed = testCase.expected.include.filter((name) => !recommendedNames.includes(name));
     const falsePositives = testCase.expected.exclude.filter((name) => recommendedNames.includes(name));
     const correctExcludes = testCase.expected.exclude.filter((name) => !recommendedNames.includes(name));
@@ -128,6 +138,7 @@ function evaluateRoutes(cases, scanResult) {
       expected: testCase.expected,
       recommended: recommendedNames,
       includeHits,
+      optionalHits,
       correctExcludes,
       missed,
       falsePositives,
