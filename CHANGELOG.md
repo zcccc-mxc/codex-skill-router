@@ -21,6 +21,8 @@ This project has not published a stable release yet.
 - Added `csr scan --hide-paths` to avoid showing local filesystem paths in shared output.
 - Added `csr scan --brief` for compact scan output.
 - Added `csr audit --severity` to focus on error, warning, or info issues.
+- Improved `csr route` scoring with name matches, description matches, exclusion penalties, and broad-description penalties.
+- Improved `csr route` description understanding with English synonyms and semantic concept hints.
 - Added `examples/eval.yml` as a small evaluation example.
 - Added Node.js built-in tests for the core CLI behavior.
 

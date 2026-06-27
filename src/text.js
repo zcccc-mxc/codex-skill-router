@@ -63,6 +63,45 @@ const CJK_SYNONYMS = {
   优化: ["optimize", "improve"],
 };
 
+const ASCII_SYNONYMS = {
+  app: ["application"],
+  application: ["app"],
+  audit: ["check", "review", "validate", "validation"],
+  browser: ["playwright", "rendering", "page"],
+  build: ["create", "generate", "make"],
+  check: ["audit", "test", "validate", "validation", "verify"],
+  create: ["build", "generate", "make"],
+  deploy: ["deployment", "publish", "release"],
+  deployment: ["deploy", "publish", "release"],
+  docs: ["documentation", "document"],
+  document: ["docs", "documentation"],
+  documentation: ["docs", "document"],
+  frontend: ["ui", "page", "layout"],
+  generate: ["build", "create", "make"],
+  image: ["photo", "picture"],
+  improve: ["optimize", "refine"],
+  layout: ["frontend", "page", "ui"],
+  mobile: ["phone", "phones", "responsive"],
+  optimize: ["improve", "refine"],
+  page: ["browser", "frontend", "layout", "ui"],
+  phone: ["mobile", "responsive"],
+  phones: ["mobile", "responsive"],
+  photo: ["image", "picture"],
+  picture: ["image", "photo"],
+  playwright: ["browser", "rendering"],
+  publish: ["deploy", "deployment", "release"],
+  refine: ["improve", "optimize"],
+  release: ["deploy", "deployment", "publish"],
+  rendering: ["browser", "playwright"],
+  responsive: ["mobile", "phone", "phones"],
+  review: ["audit", "check"],
+  test: ["check", "validate", "validation", "verify"],
+  ui: ["frontend", "layout", "page"],
+  validate: ["check", "test", "validation", "verify"],
+  validation: ["check", "test", "validate", "verify"],
+  verify: ["check", "test", "validate", "validation"],
+};
+
 function normalizeText(text) {
   return text.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, " ").trim();
 }
@@ -73,7 +112,8 @@ function tokenize(text) {
   const cjkTokens = normalized.match(/[\u4e00-\u9fa5]{2,}/g) || [];
   const cjkKeywordTokens = CJK_KEYWORDS.filter((keyword) => normalized.includes(keyword));
   const synonymTokens = cjkKeywordTokens.flatMap((keyword) => CJK_SYNONYMS[keyword] || []);
-  const tokens = [...asciiTokens, ...cjkTokens, ...cjkKeywordTokens, ...synonymTokens];
+  const asciiSynonymTokens = asciiTokens.flatMap((token) => ASCII_SYNONYMS[token] || []);
+  const tokens = [...asciiTokens, ...asciiSynonymTokens, ...cjkTokens, ...cjkKeywordTokens, ...synonymTokens];
 
   return [...new Set(tokens.filter((token) => !STOP_WORDS.has(token)))];
 }

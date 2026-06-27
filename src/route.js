@@ -1,17 +1,56 @@
 const { tokenize } = require("./text");
 
-function scoreSkill(task, skill) {
-  if (skill.status !== "ok" || !skill.description) {
-    return {
-      skill,
-      score: 0,
-      matchedTerms: [],
-      reasons: ["Skill 格式不完整，暂不推荐。"],
-    };
-  }
+const BROAD_TERMS = [
+  "anything",
+  "any task",
+  "all tasks",
+  "general purpose",
+  "use when needed",
+  "通用",
+  "任何任务",
+  "所有任务",
+  "需要时使用",
+];
 
-  const taskTerms = new Set(tokenize(task));
-  const skillTerms = new Set(tokenize(`${skill.name} ${skill.description}`));
+const EXCLUSION_MARKERS = [
+  "do not use",
+  "not use",
+  "avoid",
+  "not for",
+  "不要",
+  "不适用",
+  "避免",
+  "不要用于",
+];
+
+const DESCRIPTION_CONCEPTS = [
+  {
+    label: "文档写作",
+    terms: ["docs", "document", "documentation"],
+  },
+  {
+    label: "浏览器验证",
+    terms: ["browser", "playwright", "rendering", "screenshot", "validate", "validation", "verify"],
+  },
+  {
+    label: "移动端界面",
+    terms: ["frontend", "layout", "mobile", "page", "phone", "responsive", "ui"],
+  },
+  {
+    label: "部署发布",
+    terms: ["deploy", "deployment", "publish", "release"],
+  },
+  {
+    label: "图片生成",
+    terms: ["generate", "image", "photo", "picture"],
+  },
+  {
+    label: "质量检查",
+    terms: ["audit", "check", "review", "test", "validate", "validation", "verify"],
+  },
+];
+
+function countMatches(taskTerms, skillTerms) {
   const matchedTerms = [];
 
   for (const term of taskTerms) {
@@ -20,16 +59,92 @@ function scoreSkill(task, skill) {
     }
   }
 
-  const nameBoost = [...taskTerms].some((term) => skill.name.toLowerCase().includes(term)) ? 2 : 0;
-  const score = matchedTerms.length + nameBoost;
-  const reasons = [];
+  return matchedTerms;
+}
 
-  if (matchedTerms.length > 0) {
-    reasons.push(`匹配到关键词：${matchedTerms.join(", ")}。`);
+function matchDescriptionConcepts(taskTerms, descriptionTerms) {
+  return DESCRIPTION_CONCEPTS.filter((concept) => {
+    const taskMatched = concept.terms.some((term) => taskTerms.has(term));
+    const descriptionMatched = concept.terms.some((term) => descriptionTerms.has(term));
+
+    return taskMatched && descriptionMatched;
+  }).map((concept) => concept.label);
+}
+
+function extractExclusionText(description) {
+  const normalized = description.toLowerCase();
+  const parts = [];
+
+  for (const marker of EXCLUSION_MARKERS) {
+    const index = normalized.indexOf(marker);
+    if (index >= 0) {
+      parts.push(description.slice(index));
+    }
   }
 
-  if (nameBoost > 0) {
-    reasons.push("任务描述和 Skill 名称有直接关联。");
+  return parts.join(" ");
+}
+
+function hasBroadDescription(description) {
+  const normalized = description.toLowerCase();
+  return BROAD_TERMS.some((term) => normalized.includes(term));
+}
+
+function scoreSkill(task, skill) {
+  if (skill.status !== "ok" || !skill.description) {
+    return {
+      skill,
+      score: 0,
+      matchedTerms: [],
+      scoreDetails: {
+        nameMatches: [],
+        descriptionMatches: [],
+        semanticMatches: [],
+        exclusionMatches: [],
+        broadPenalty: 0,
+      },
+      reasons: ["Skill 格式不完整，暂不推荐。"],
+    };
+  }
+
+  const taskTerms = new Set(tokenize(task));
+  const nameTerms = new Set(tokenize(skill.name || ""));
+  const descriptionTerms = new Set(tokenize(skill.description || ""));
+  const exclusionTerms = new Set(tokenize(extractExclusionText(skill.description || "")));
+  const nameMatches = countMatches(taskTerms, nameTerms);
+  const descriptionMatches = countMatches(taskTerms, descriptionTerms);
+  const semanticMatches = matchDescriptionConcepts(taskTerms, descriptionTerms);
+  const exclusionMatches = countMatches(taskTerms, exclusionTerms);
+  const matchedTerms = [...new Set([...nameMatches, ...descriptionMatches])];
+  const broadPenalty = hasBroadDescription(skill.description) ? 1 : 0;
+
+  const rawScore =
+    nameMatches.length * 3 +
+    descriptionMatches.length +
+    semanticMatches.length * 2 -
+    exclusionMatches.length * 4 -
+    broadPenalty;
+  const score = Math.max(0, rawScore);
+  const reasons = [];
+
+  if (nameMatches.length > 0) {
+    reasons.push(`Skill 名称命中：${nameMatches.join(", ")}。`);
+  }
+
+  if (descriptionMatches.length > 0) {
+    reasons.push(`description 命中：${descriptionMatches.join(", ")}。`);
+  }
+
+  if (semanticMatches.length > 0) {
+    reasons.push(`语义理解：${semanticMatches.join(", ")}。`);
+  }
+
+  if (exclusionMatches.length > 0) {
+    reasons.push(`命中不适用条件：${exclusionMatches.join(", ")}，因此降低推荐分。`);
+  }
+
+  if (broadPenalty > 0) {
+    reasons.push("description 可能过于宽泛，降低推荐分。");
   }
 
   if (reasons.length === 0) {
@@ -40,6 +155,13 @@ function scoreSkill(task, skill) {
     skill,
     score,
     matchedTerms,
+    scoreDetails: {
+      nameMatches,
+      descriptionMatches,
+      semanticMatches,
+      exclusionMatches,
+      broadPenalty,
+    },
     reasons,
   };
 }

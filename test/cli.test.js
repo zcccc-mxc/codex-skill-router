@@ -367,6 +367,120 @@ description: 用于检查页面、浏览器显示和移动端布局。
   assert.match(output, /移动端/);
 });
 
+test("routes prefer specific skills over broad skills", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-route-specific-"));
+  const specificDir = path.join(tempRoot, "frontend-ui");
+  const broadDir = path.join(tempRoot, "general-helper");
+  fs.mkdirSync(specificDir, { recursive: true });
+  fs.mkdirSync(broadDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(specificDir, "SKILL.md"),
+    `---
+name: frontend-ui
+description: Use when optimizing frontend page layout and mobile display.
+---
+
+# Frontend UI
+`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(broadDir, "SKILL.md"),
+    `---
+name: general-helper
+description: Use when needed for frontend mobile layout or any task.
+---
+
+# General Helper
+`,
+    "utf8",
+  );
+
+  const output = run(["route", "optimize frontend mobile layout", "--path", tempRoot]);
+
+  assert.ok(output.indexOf("frontend-ui") < output.indexOf("general-helper"));
+  assert.match(output, /description .*frontend/);
+});
+
+test("routes lower skills when task matches exclusion text", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-route-exclusion-"));
+  const frontendDir = path.join(tempRoot, "frontend-ui");
+  const databaseDir = path.join(tempRoot, "database-migration");
+  fs.mkdirSync(frontendDir, { recursive: true });
+  fs.mkdirSync(databaseDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(frontendDir, "SKILL.md"),
+    `---
+name: frontend-ui
+description: Use when optimizing frontend page layout and mobile display.
+---
+
+# Frontend UI
+`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(databaseDir, "SKILL.md"),
+    `---
+name: database-migration
+description: Use when changing database schema. Do not use for frontend page layout.
+---
+
+# Database Migration
+`,
+    "utf8",
+  );
+
+  const output = run(["route", "optimize frontend page layout", "--path", tempRoot]);
+
+  assert.ok(output.indexOf("frontend-ui") < output.indexOf("database-migration"));
+  assert.match(output, /命中不适用条件/);
+});
+
+test("routes understands documentation synonyms in descriptions", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-route-docs-"));
+  const docsDir = path.join(tempRoot, "docs-authoring");
+  fs.mkdirSync(docsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(docsDir, "SKILL.md"),
+    `---
+name: docs-authoring
+description: Use when writing documentation pages and editing guides.
+---
+
+# Docs Authoring
+`,
+    "utf8",
+  );
+
+  const output = run(["route", "make docs clearer", "--path", tempRoot]);
+
+  assert.match(output, /docs-authoring/);
+  assert.match(output, /语义理解/);
+});
+
+test("routes understands browser validation descriptions", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-route-browser-"));
+  const browserDir = path.join(tempRoot, "browser-validation");
+  fs.mkdirSync(browserDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(browserDir, "SKILL.md"),
+    `---
+name: browser-validation
+description: Use when running Playwright checks for UI rendering.
+---
+
+# Browser Validation
+`,
+    "utf8",
+  );
+
+  const output = run(["route", "validate page rendering in browser", "--path", tempRoot]);
+
+  assert.match(output, /browser-validation/);
+  assert.match(output, /语义理解/);
+});
+
 test("evaluates route cases from json", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-"));
   const skillDir = path.join(tempRoot, "deploy-skill");

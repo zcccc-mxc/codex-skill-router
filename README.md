@@ -27,7 +27,7 @@ Current implementation status:
 
 - `scan`: implemented for local `SKILL.md` discovery and frontmatter reading.
 - `audit`: implemented for basic configuration checks.
-- `route`: implemented for basic local keyword-based recommendations.
+- `route`: implemented for local recommendations with explainable scoring and basic description understanding.
 - `eval`: implemented for JSON and simple YAML test files.
 
 ## Try The Current CLI Shell
