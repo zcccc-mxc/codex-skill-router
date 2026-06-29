@@ -1,22 +1,100 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const YAML = require("yaml");
 
 const IGNORED_DIRS = new Set([".git", "node_modules", "dist", "build", "coverage"]);
 
+function findGitRoot(cwd = process.cwd()) {
+  let currentPath = path.resolve(cwd);
+
+  while (true) {
+    if (fs.existsSync(path.join(currentPath, ".git"))) {
+      return currentPath;
+    }
+
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) {
+      return path.resolve(cwd);
+    }
+
+    currentPath = parentPath;
+  }
+}
+
+function uniqueRoots(roots) {
+  const seen = new Set();
+  const result = [];
+
+  for (const item of roots) {
+    const key = path.resolve(item.root).toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+}
+
+function projectAgentSkillRoots(cwd, gitRoot) {
+  const roots = [];
+  let currentPath = path.resolve(cwd);
+  const stopPath = path.resolve(gitRoot);
+
+  while (true) {
+    roots.push({
+      root: path.join(currentPath, ".agents", "skills"),
+      source: "project",
+      rootType: "standard",
+    });
+
+    if (currentPath === stopPath) {
+      break;
+    }
+
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) {
+      break;
+    }
+
+    currentPath = parentPath;
+  }
+
+  return roots;
+}
+
 function defaultScanRoots(cwd = process.cwd(), home = os.homedir()) {
-  return [
-    { root: path.join(cwd, ".codex", "skills"), source: "project" },
-    { root: path.join(cwd, "skills"), source: "project" },
-    { root: path.join(home, ".codex", "skills"), source: "user" },
+  const gitRoot = findGitRoot(cwd);
+  const roots = [
+    ...projectAgentSkillRoots(cwd, gitRoot),
+    { root: path.join(home, ".agents", "skills"), source: "user", rootType: "standard" },
   ];
+
+  const adminRoot = path.join(path.sep, "etc", "codex", "skills");
+  if (process.platform !== "win32" && fs.existsSync(adminRoot)) {
+    roots.push({ root: adminRoot, source: "admin", rootType: "standard" });
+  }
+
+  roots.push(
+    { root: path.join(cwd, ".codex", "skills"), source: "legacy", rootType: "legacy" },
+    { root: path.join(cwd, "skills"), source: "legacy", rootType: "legacy" },
+    { root: path.join(home, ".codex", "skills"), source: "legacy", rootType: "legacy" },
+  );
+
+  return uniqueRoots(roots);
 }
 
 function customScanRoots(paths, cwd = process.cwd()) {
-  return paths.map((inputPath) => ({
-    root: path.resolve(cwd, inputPath),
-    source: "custom",
-  }));
+  return uniqueRoots(
+    paths.map((inputPath) => ({
+      root: path.resolve(cwd, inputPath),
+      source: "custom",
+      rootType: "custom",
+    })),
+  );
 }
 
 function findSkillFiles(root) {
@@ -52,16 +130,18 @@ function findSkillFiles(root) {
 }
 
 function parseFrontmatter(content) {
-  if (!content.startsWith("---\n") && !content.startsWith("---\r\n")) {
+  const normalized = content.replace(/\r\n/g, "\n");
+
+  if (!normalized.startsWith("---\n")) {
     return {
       name: "",
       description: "",
       status: "format-error",
+      errorType: "missing-frontmatter-start",
       message: "SKILL.md 缺少 YAML frontmatter。",
     };
   }
 
-  const normalized = content.replace(/\r\n/g, "\n");
   const endIndex = normalized.indexOf("\n---", 4);
 
   if (endIndex === -1) {
@@ -69,59 +149,82 @@ function parseFrontmatter(content) {
       name: "",
       description: "",
       status: "format-error",
+      errorType: "missing-frontmatter-end",
       message: "SKILL.md 的 YAML frontmatter 没有正确结束。",
     };
   }
 
-  const metadata = normalized.slice(4, endIndex).split("\n");
-  const values = {};
-
-  for (let index = 0; index < metadata.length; index += 1) {
-    const line = metadata[index];
-    const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!match) {
-      continue;
+  let values;
+  try {
+    const document = YAML.parseDocument(normalized.slice(4, endIndex), { prettyErrors: false });
+    if (document.errors.length > 0) {
+      throw document.errors[0];
     }
 
-    const key = match[1];
-    const rawValue = match[2].trim();
-
-    if (rawValue === ">-" || rawValue === ">" || rawValue === "|" || rawValue === "|-") {
-      const blockLines = [];
-
-      while (index + 1 < metadata.length && /^\s+/.test(metadata[index + 1])) {
-        index += 1;
-        blockLines.push(metadata[index].trim());
-      }
-
-      values[key] = blockLines.join(rawValue.startsWith("|") ? "\n" : " ").trim();
-      continue;
-    }
-
-    values[key] = rawValue.replace(/^["']|["']$/g, "");
+    values = document.toJS() || {};
+  } catch (error) {
+    return {
+      name: "",
+      description: "",
+      status: "format-error",
+      errorType: "yaml-syntax",
+      message: `YAML 语法错误：${error.message}`,
+    };
   }
 
   const name = values.name || "";
   const description = values.description || "";
 
-  if (!name || !description) {
+  if (values.name === undefined || values.name === null) {
     return {
-      name,
+      name: "",
       description,
       status: "format-error",
-      message: !name ? "缺少 name。" : "缺少 description。",
+      errorType: "missing-name",
+      message: "缺少 name。",
+    };
+  }
+
+  if (typeof values.name !== "string") {
+    return {
+      name: "",
+      description,
+      status: "format-error",
+      errorType: "invalid-name-type",
+      message: "name 必须是字符串。",
+    };
+  }
+
+  if (values.description === undefined || values.description === null) {
+    return {
+      name,
+      description: "",
+      status: "format-error",
+      errorType: "missing-description",
+      message: "缺少 description。",
+    };
+  }
+
+  if (typeof values.description !== "string") {
+    return {
+      name,
+      description: "",
+      status: "format-error",
+      errorType: "invalid-description-type",
+      message: "description 必须是字符串。",
     };
   }
 
   return {
-    name,
-    description,
+    name: name.trim(),
+    description: description.trim(),
     status: "ok",
+    errorType: "",
     message: "",
   };
 }
 
-function readSkillFile(filePath, source) {
+function readSkillFile(filePath, source, rootType) {
   try {
     const content = fs.readFileSync(filePath, "utf8");
     const parsed = parseFrontmatter(content);
@@ -131,7 +234,9 @@ function readSkillFile(filePath, source) {
       description: parsed.description,
       path: filePath,
       source,
+      rootType,
       status: parsed.status,
+      errorType: parsed.errorType,
       message: parsed.message,
     };
   } catch (error) {
@@ -140,10 +245,22 @@ function readSkillFile(filePath, source) {
       description: "",
       path: filePath,
       source,
+      rootType,
       status: "read-error",
+      errorType: "read-error",
       message: "文件无法读取。",
     };
   }
+}
+
+function sourceCounts(skills) {
+  return {
+    project: skills.filter((skill) => skill.source === "project").length,
+    user: skills.filter((skill) => skill.source === "user").length,
+    admin: skills.filter((skill) => skill.source === "admin").length,
+    legacy: skills.filter((skill) => skill.source === "legacy").length,
+    custom: skills.filter((skill) => skill.source === "custom").length,
+  };
 }
 
 function scanSkills(options = {}) {
@@ -154,10 +271,10 @@ function scanSkills(options = {}) {
   const skills = [];
   const missingRoots = [];
 
-  for (const { root, source } of roots) {
+  roots.forEach(({ root, source, rootType }, rootIndex) => {
     if (!fs.existsSync(root)) {
       missingRoots.push(root);
-      continue;
+      return;
     }
 
     const skillFiles = findSkillFiles(root);
@@ -169,30 +286,43 @@ function scanSkills(options = {}) {
       }
 
       seen.add(resolvedPath);
-      skills.push(readSkillFile(resolvedPath, source));
+      skills.push({ ...readSkillFile(resolvedPath, source, rootType), rootIndex });
     }
-  }
+  });
 
-  skills.sort((left, right) => left.path.localeCompare(right.path));
+  skills.sort((left, right) => {
+    if (left.rootIndex !== right.rootIndex) {
+      return left.rootIndex - right.rootIndex;
+    }
+
+    return left.path.localeCompare(right.path);
+  });
+
+  const publicSkills = skills.map(({ rootIndex, ...skill }) => skill);
 
   const summary = {
     roots: roots.length,
     missingRoots: missingRoots.length,
-    total: skills.length,
-    ok: skills.filter((skill) => skill.status === "ok").length,
-    formatErrors: skills.filter((skill) => skill.status === "format-error").length,
-    readErrors: skills.filter((skill) => skill.status === "read-error").length,
+    total: publicSkills.length,
+    ok: publicSkills.filter((skill) => skill.status === "ok").length,
+    formatErrors: publicSkills.filter((skill) => skill.status === "format-error").length,
+    readErrors: publicSkills.filter((skill) => skill.status === "read-error").length,
+    sources: sourceCounts(publicSkills),
   };
 
   return {
     summary,
     roots: roots.map((item) => item.root),
     missingRoots,
-    skills,
+    skills: publicSkills,
   };
 }
 
 module.exports = {
+  customScanRoots,
+  defaultScanRoots,
+  findGitRoot,
   parseFrontmatter,
   scanSkills,
+  sourceCounts,
 };

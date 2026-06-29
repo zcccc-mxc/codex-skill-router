@@ -20,13 +20,13 @@ Codex Skill Router 不能控制 Codex 内部一定调用哪个 Skill。
 当前项目在：
 
 ```powershell
-D:\AI NEW\codex-skill-router
+<你的项目目录>\codex-skill-router
 ```
 
 进入项目目录：
 
 ```powershell
-cd "D:\AI NEW\codex-skill-router"
+cd "<你的项目目录>\codex-skill-router"
 ```
 
 ## 最简单的试用方式
@@ -252,7 +252,7 @@ csr scan --path .\examples\skills --show-paths
 你可以按这个顺序试：
 
 ```powershell
-cd "D:\AI NEW\codex-skill-router"
+cd "<你的项目目录>\codex-skill-router"
 node src\cli.js --help
 node src\cli.js scan --path .\examples\skills
 node src\cli.js audit --severity warning --path .\examples\skills

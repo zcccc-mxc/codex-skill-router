@@ -1,3 +1,6 @@
+const { extractApplicabilityText, hasExclusionMarker } = require("./exclusions");
+const { tokenize } = require("./text");
+
 const BROAD_PHRASES = [
   "anything",
   "any task",
@@ -9,30 +12,6 @@ const BROAD_PHRASES = [
   "所有任务",
   "需要时使用",
 ];
-
-const { normalizeText, tokenize } = require("./text");
-
-const EXCLUSION_MARKERS = [
-  "do not use",
-  "not use",
-  "avoid",
-  "not for",
-  "涓嶈",
-  "涓嶉€傜敤",
-  "閬垮厤",
-  "涓嶈鐢ㄤ簬",
-];
-
-function extractApplicabilityText(description) {
-  const normalized = description.toLowerCase();
-  const markerIndexes = EXCLUSION_MARKERS.map((marker) => normalized.indexOf(marker)).filter((index) => index >= 0);
-
-  if (markerIndexes.length === 0) {
-    return description;
-  }
-
-  return description.slice(0, Math.min(...markerIndexes));
-}
 
 function similarity(left, right) {
   const leftTokens = new Set(tokenize(extractApplicabilityText(left)));
@@ -65,7 +44,7 @@ function issue(skill, type, severity, message, suggestion) {
 
 function auditSkillShape(skill) {
   const issues = [];
-  const description = skill.description.trim();
+  const description = (skill.description || "").trim();
 
   if (skill.status !== "ok") {
     issues.push(issue(skill, "format", "error", skill.message || "SKILL.md 格式存在问题。", "先修复 SKILL.md 的基础格式。"));
@@ -103,11 +82,11 @@ function auditSkillShape(skill) {
 
   if (!/use when|when|适用|使用|触发|用于/.test(lowerDescription)) {
     issues.push(
-      issue(skill, "missing-use-condition", "info", "description 没有明显说明什么时候使用。", "建议加入“Use when...”或中文等价说明。"),
+      issue(skill, "missing-use-condition", "info", "description 没有明显说明什么时候使用。", "建议加入 “Use when...” 或中文等价说明。"),
     );
   }
 
-  if (!/do not use|not use|不要|不适用|避免/.test(lowerDescription)) {
+  if (!hasExclusionMarker(description)) {
     issues.push(
       issue(skill, "missing-exclusion", "info", "description 没有说明什么时候不使用。", "建议补充不适用场景，减少误触发。"),
     );

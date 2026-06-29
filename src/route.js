@@ -1,3 +1,4 @@
+const { extractApplicabilityText, extractExclusionText } = require("./exclusions");
 const { normalizeText, tokenize } = require("./text");
 
 const BROAD_TERMS = [
@@ -10,17 +11,6 @@ const BROAD_TERMS = [
   "任何任务",
   "所有任务",
   "需要时使用",
-];
-
-const EXCLUSION_MARKERS = [
-  "do not use",
-  "not use",
-  "avoid",
-  "not for",
-  "不要",
-  "不适用",
-  "避免",
-  "不要用于",
 ];
 
 const DESCRIPTION_CONCEPTS = [
@@ -63,6 +53,14 @@ const GENERIC_ROUTE_TERMS = new Set([
 ]);
 
 const GENERIC_SEMANTIC_LABELS = new Set([DESCRIPTION_CONCEPTS[5].label]);
+
+const SOURCE_PRIORITY = {
+  project: 3,
+  user: 2,
+  admin: 1,
+  custom: 0,
+  legacy: -1,
+};
 
 const PHRASE_CONCEPTS = [
   {
@@ -120,37 +118,47 @@ function matchPhraseConcepts(task, description) {
   }).map((concept) => concept.label);
 }
 
-function extractExclusionText(description) {
-  const normalized = description.toLowerCase();
-  const parts = [];
-
-  for (const marker of EXCLUSION_MARKERS) {
-    const index = normalized.indexOf(marker);
-    if (index >= 0) {
-      parts.push(description.slice(index));
-    }
-  }
-
-  return parts.join(" ");
-}
-
-function extractApplicabilityText(description) {
-  const normalized = description.toLowerCase();
-  const markerIndexes = EXCLUSION_MARKERS.map((marker) => normalized.indexOf(marker)).filter((index) => index >= 0);
-
-  if (markerIndexes.length === 0) {
-    return description;
-  }
-
-  return description.slice(0, Math.min(...markerIndexes));
-}
-
 function hasBroadDescription(description) {
   const normalized = description.toLowerCase();
   return BROAD_TERMS.some((term) => normalized.includes(term));
 }
 
-function scoreSkill(task, skill) {
+function isSmallLocalTask(task) {
+  const normalized = normalizeText(task);
+  const smallScopePatterns = [
+    /\brename\b.*\b(variable|const|constant|field)\b/,
+    /\bfix\b.*\btypo\b/,
+    /\bexplain\b.*\b(one|single|this)\b.*\b(line|option)\b/,
+    /\bchange\b.*\b(one|single|simple)\b.*\b(sentence|heading|title)\b/,
+    /\bdelete\b.*\b(unused\s+)?comment\b/,
+    /\badjust\b.*\b(one|single)\b.*\bconstant\b/,
+    /\bshow\b.*\b(contents?|file)\b/,
+    /\bformat\b.*\b(small|short)\b.*\b(paragraph|text)\b/,
+  ];
+
+  return smallScopePatterns.some((pattern) => pattern.test(normalized));
+}
+
+function sourcePriority(skill) {
+  return SOURCE_PRIORITY[skill.source] || 0;
+}
+
+function matchContextHints(taskTerms, skill, context = {}) {
+  const hints = context.skillHints || [];
+  const matches = [];
+
+  for (const hint of hints) {
+    if (!hint || hint.skill !== skill.name) {
+      continue;
+    }
+
+    matches.push(...countMatches(taskTerms, new Set(hint.terms || [])));
+  }
+
+  return [...new Set(matches)];
+}
+
+function scoreSkill(task, skill, context = {}) {
   if (skill.status !== "ok" || !skill.description) {
     return {
       skill,
@@ -161,8 +169,10 @@ function scoreSkill(task, skill) {
         descriptionMatches: [],
         semanticMatches: [],
         phraseMatches: [],
+        contextMatches: [],
         exclusionMatches: [],
         broadPenalty: 0,
+        sourcePriority: sourcePriority(skill),
       },
       reasons: ["Skill 格式不完整，暂不推荐。"],
     };
@@ -177,26 +187,31 @@ function scoreSkill(task, skill) {
   const descriptionMatches = countMatches(taskTerms, descriptionTerms);
   const semanticMatches = matchDescriptionConcepts(taskTerms, descriptionTerms);
   const phraseMatches = matchPhraseConcepts(task, applicabilityText);
+  const contextMatches = matchContextHints(taskTerms, skill, context);
   const exclusionMatches = countMatches(taskTerms, exclusionTerms).filter((term) => !GENERIC_ROUTE_TERMS.has(term));
   const matchedTerms = [...new Set([...nameMatches, ...descriptionMatches])];
   const concreteNameMatches = nameMatches.filter((term) => !GENERIC_ROUTE_TERMS.has(term));
   const concreteMatches = matchedTerms.filter((term) => !GENERIC_ROUTE_TERMS.has(term));
   const concreteSemanticMatches = semanticMatches.filter((label) => !GENERIC_SEMANTIC_LABELS.has(label));
   const broadPenalty = hasBroadDescription(skill.description) ? 1 : 0;
+  const priority = sourcePriority(skill);
 
   const rawScore =
     nameMatches.length * 3 +
     descriptionMatches.length +
     semanticMatches.length * 2 +
-    phraseMatches.length * 3 -
-    exclusionMatches.length * 4 -
+    phraseMatches.length * 3 +
+    contextMatches.length * 3 -
+    exclusionMatches.length * 2 -
     broadPenalty;
   const hasReliableEvidence =
     concreteMatches.length > 0 ||
     concreteNameMatches.length > 0 ||
     concreteSemanticMatches.length > 0 ||
-    phraseMatches.length > 0;
-  const score = hasReliableEvidence ? Math.max(0, rawScore) : 0;
+    phraseMatches.length > 0 ||
+    contextMatches.length > 0;
+  const baseScore = hasReliableEvidence ? Math.max(0, rawScore) : 0;
+  const score = baseScore > 0 ? Math.max(0, baseScore + priority * 0.25) : 0;
   const reasons = [];
 
   if (nameMatches.length > 0) {
@@ -223,6 +238,10 @@ function scoreSkill(task, skill) {
     reasons.push("description 可能过于宽泛，降低推荐分。");
   }
 
+  if (contextMatches.length > 0) {
+    reasons.push(`Local context matched: ${contextMatches.join(", ")}.`);
+  }
+
   if (reasons.length === 0) {
     reasons.push("没有找到明显匹配的关键词。");
   }
@@ -236,8 +255,10 @@ function scoreSkill(task, skill) {
       descriptionMatches,
       semanticMatches,
       phraseMatches,
+      contextMatches,
       exclusionMatches,
       broadPenalty,
+      sourcePriority: priority,
     },
     reasons,
   };
@@ -246,17 +267,24 @@ function scoreSkill(task, skill) {
 function routeTask(task, scanResult, options = {}) {
   const limit = options.limit || 3;
   const minScore = options.minScore || 2;
+  const context = options.context || {};
   const scored = (scanResult.skills || [])
-    .map((skill) => scoreSkill(task, skill))
+    .map((skill) => scoreSkill(task, skill, context))
     .sort((left, right) => {
       if (right.score !== left.score) {
         return right.score - left.score;
       }
 
+      const priorityDifference = sourcePriority(right.skill) - sourcePriority(left.skill);
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
       return left.skill.path.localeCompare(right.skill.path);
     });
 
-  const recommended = scored.filter((item) => item.score >= minScore).slice(0, limit);
+  const suppressSmallTask = isSmallLocalTask(task);
+  const recommended = suppressSmallTask ? [] : scored.filter((item) => item.score >= minScore).slice(0, limit);
   const notRecommended = scored.filter((item) => item.score < minScore).slice(0, limit);
 
   return {
@@ -264,11 +292,19 @@ function routeTask(task, scanResult, options = {}) {
     skillCount: scanResult.skills?.length || 0,
     recommended,
     notRecommended,
+    suppressSmallTask,
+    contextSummary: {
+      files: context.contextFiles?.length || 0,
+      skillHints: context.skillHints?.length || 0,
+      packageTerms: context.packageTerms?.length || 0,
+    },
     note: "这是本地路由预测，不代表 Codex 实际内部一定会调用这些 Skills。",
   };
 }
 
 module.exports = {
+  isSmallLocalTask,
   routeTask,
   scoreSkill,
+  sourcePriority,
 };

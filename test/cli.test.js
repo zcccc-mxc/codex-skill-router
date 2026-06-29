@@ -4,8 +4,11 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { similarity } = require("../src/audit");
-const { routeTask } = require("../src/route");
+const { auditSkills, similarity } = require("../src/audit");
+const { extractSkillHints, loadRouteContext } = require("../src/context");
+const { evaluateRoutes, loadEvalCases, parseEvalContent, validateEvalCases } = require("../src/evaluate");
+const { isSmallLocalTask, routeTask } = require("../src/route");
+const { defaultScanRoots, parseFrontmatter, scanSkills, sourceCounts } = require("../src/scan");
 
 const cliPath = path.join(__dirname, "..", "src", "cli.js");
 
@@ -27,6 +30,22 @@ function runFailure(args) {
   }
 
   throw new Error("Expected command to fail.");
+}
+
+function writeSkill(root, dirName, name, description) {
+  const skillDir = path.join(root, dirName);
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: ${name}
+description: ${description}
+---
+
+# ${name}
+`,
+    "utf8",
+  );
 }
 
 test("prints help", () => {
@@ -70,9 +89,8 @@ description: Use when testing the scan command.
 
   const output = run(["scan", tempRoot]);
 
-  assert.match(output, /找到 Skills: 1/);
-  assert.match(output, /正常: 1/);
-  assert.match(output, /格式错误: 0/);
+  assert.match(output, /发现 1 个 Skills/);
+  assert.match(output, /custom：1/);
   assert.match(output, /sample-skill/);
   assert.match(output, /Use when testing the scan command/);
   assert.match(output, /来源: custom/);
@@ -126,6 +144,171 @@ description: Use when testing scan path option support.
   assert.equal(parsed.skills[0].name, "path-option-skill");
 });
 
+test("counts scan skill sources", () => {
+  assert.deepEqual(
+    sourceCounts([
+      { source: "project" },
+      { source: "project" },
+      { source: "user" },
+      { source: "admin" },
+      { source: "legacy" },
+      { source: "custom" },
+    ]),
+    {
+      project: 2,
+      user: 1,
+      admin: 1,
+      legacy: 1,
+      custom: 1,
+    },
+  );
+});
+
+test("default scan roots walk .agents skills up to git root", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-roots-"));
+  const nestedDir = path.join(tempRoot, "packages", "app");
+  const homeDir = path.join(tempRoot, "home");
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  fs.mkdirSync(nestedDir, { recursive: true });
+
+  const roots = defaultScanRoots(nestedDir, homeDir);
+  const rootPaths = roots.map((item) => item.root);
+
+  assert.equal(rootPaths[0], path.join(nestedDir, ".agents", "skills"));
+  assert.equal(rootPaths[1], path.join(tempRoot, "packages", ".agents", "skills"));
+  assert.equal(rootPaths[2], path.join(tempRoot, ".agents", "skills"));
+  assert.equal(rootPaths.includes(path.join(path.dirname(tempRoot), ".agents", "skills")), false);
+  assert.ok(roots.some((item) => item.root === path.join(homeDir, ".agents", "skills") && item.source === "user"));
+  assert.ok(roots.some((item) => item.root === path.join(nestedDir, ".codex", "skills") && item.source === "legacy"));
+  assert.ok(roots.some((item) => item.root === path.join(nestedDir, "skills") && item.source === "legacy"));
+  assert.ok(roots.some((item) => item.root === path.join(homeDir, ".codex", "skills") && item.source === "legacy"));
+});
+
+test("default scan does not walk above cwd when no git root exists", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-no-git-"));
+  const nestedDir = path.join(tempRoot, "packages", "app");
+  const homeDir = path.join(tempRoot, "home");
+  fs.mkdirSync(nestedDir, { recursive: true });
+
+  const roots = defaultScanRoots(nestedDir, homeDir);
+  const projectRoots = roots.filter((item) => item.source === "project").map((item) => item.root);
+
+  assert.deepEqual(projectRoots, [path.join(nestedDir, ".agents", "skills")]);
+});
+
+test("default scan reads project .agents skills up to git root", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-project-agents-"));
+  const nestedDir = path.join(tempRoot, "packages", "app");
+  const nestedSkills = path.join(nestedDir, ".agents", "skills");
+  const rootSkills = path.join(tempRoot, ".agents", "skills");
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  writeSkill(nestedSkills, "nested-skill", "nested-skill", "Use when testing nested project standard Skills. Do not use for docs.");
+  writeSkill(rootSkills, "root-skill", "root-skill", "Use when testing root project standard Skills. Do not use for docs.");
+
+  const result = scanSkills({ cwd: nestedDir, home: path.join(tempRoot, "home") });
+
+  assert.equal(result.summary.sources.project, 2);
+  assert.deepEqual(
+    result.skills.map((skill) => [skill.name, skill.source, skill.rootType]),
+    [
+      ["nested-skill", "project", "standard"],
+      ["root-skill", "project", "standard"],
+    ],
+  );
+});
+
+test("default scan reads user .agents skills as user source", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-user-agents-"));
+  const homeDir = path.join(tempRoot, "home");
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  writeSkill(
+    path.join(homeDir, ".agents", "skills"),
+    "user-skill",
+    "user-skill",
+    "Use when testing user-level standard Skills. Do not use for docs.",
+  );
+
+  const result = scanSkills({ cwd: tempRoot, home: homeDir });
+
+  assert.equal(result.summary.sources.user, 1);
+  assert.equal(result.skills[0].name, "user-skill");
+  assert.equal(result.skills[0].source, "user");
+  assert.equal(result.skills[0].rootType, "standard");
+});
+
+test("default scan keeps standard roots before legacy roots", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-standard-legacy-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  writeSkill(path.join(tempRoot, ".agents", "skills"), "standard-skill", "standard-skill", "Use when testing standard scan priority. Do not use for docs.");
+  writeSkill(path.join(tempRoot, "skills"), "legacy-skill", "legacy-skill", "Use when testing legacy scan priority. Do not use for docs.");
+
+  const result = scanSkills({ cwd: tempRoot, home: path.join(tempRoot, "home") });
+
+  assert.deepEqual(
+    result.skills.map((skill) => [skill.name, skill.source, skill.rootType]),
+    [
+      ["standard-skill", "project", "standard"],
+      ["legacy-skill", "legacy", "legacy"],
+    ],
+  );
+});
+
+test("custom scan paths are deduplicated and do not mix default roots", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-custom-dedupe-"));
+  const customRoot = path.join(tempRoot, "custom-skills");
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  writeSkill(customRoot, "custom-skill", "custom-skill", "Use when testing custom path scans. Do not use for docs.");
+  writeSkill(path.join(tempRoot, ".agents", "skills"), "project-skill", "project-skill", "Use when testing default path scans. Do not use for docs.");
+
+  const result = scanSkills({ cwd: tempRoot, home: path.join(tempRoot, "home"), paths: [customRoot, customRoot] });
+
+  assert.equal(result.summary.roots, 1);
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.skills[0].name, "custom-skill");
+  assert.equal(result.skills[0].source, "custom");
+  assert.equal(result.skills[0].rootType, "custom");
+});
+
+test("git worktree .git file stops project root walk", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-git-file-"));
+  const nestedDir = path.join(tempRoot, "packages", "app");
+  fs.mkdirSync(nestedDir, { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, ".git"), "gitdir: ../real-git-dir\n", "utf8");
+
+  const roots = defaultScanRoots(nestedDir, path.join(tempRoot, "home"));
+  const projectRoots = roots.filter((item) => item.source === "project").map((item) => item.root);
+
+  assert.deepEqual(projectRoots, [
+    path.join(nestedDir, ".agents", "skills"),
+    path.join(tempRoot, "packages", ".agents", "skills"),
+    path.join(tempRoot, ".agents", "skills"),
+  ]);
+});
+
+test("default scan marks legacy skill directories", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-legacy-"));
+  const legacyDir = path.join(tempRoot, "skills", "legacy-skill");
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  fs.mkdirSync(legacyDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(legacyDir, "SKILL.md"),
+    `---
+name: legacy-skill
+description: Use when testing legacy scan compatibility.
+---
+
+# Legacy Skill
+`,
+    "utf8",
+  );
+
+  const result = scanSkills({ cwd: tempRoot, home: path.join(tempRoot, "home") });
+
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.skills[0].name, "legacy-skill");
+  assert.equal(result.skills[0].source, "legacy");
+});
+
 test("marks malformed skill files", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-scan-bad-"));
   const skillDir = path.join(tempRoot, "bad-skill");
@@ -134,8 +317,8 @@ test("marks malformed skill files", () => {
 
   const output = run(["scan", tempRoot]);
 
-  assert.match(output, /找到 Skills: 1/);
-  assert.match(output, /格式错误: 1/);
+  assert.match(output, /发现 1 个 Skills/);
+  assert.match(output, /格式错误/);
   assert.match(output, /格式错误/);
   assert.match(output, /缺少 YAML frontmatter/);
 });
@@ -280,6 +463,50 @@ description: >-
   assert.match(output, /Use when the user needs multiline metadata support/);
 });
 
+test("parses standard YAML frontmatter shapes", () => {
+  const folded = parseFrontmatter(`---
+name: "frontend-review"
+description: >
+  Review existing pages, visual hierarchy,
+  responsive layout, and interaction clarity.
+metadata:
+  category: frontend
+allowed-tools:
+  - browser
+  - shell
+---
+
+# Skill
+`);
+
+  assert.equal(folded.status, "ok");
+  assert.equal(folded.name, "frontend-review");
+  assert.match(folded.description, /Review existing pages/);
+  assert.match(folded.description, /interaction clarity/);
+
+  const literal = parseFrontmatter(`---\r
+name: literal-skill\r
+description: |\r
+  Line one.\r
+  Line two.\r
+metadata:\r
+  enabled: true\r
+---\r
+# Skill\r
+`);
+
+  assert.equal(literal.status, "ok");
+  assert.match(literal.description, /Line one\.\nLine two\./);
+});
+
+test("reports frontmatter YAML and type errors", () => {
+  assert.equal(parseFrontmatter("# Missing\n").errorType, "missing-frontmatter-start");
+  assert.equal(parseFrontmatter("---\nname: broken\n").errorType, "missing-frontmatter-end");
+  assert.equal(parseFrontmatter("---\nname: [\n---\n").errorType, "yaml-syntax");
+  assert.equal(parseFrontmatter("---\nname: 123\ndescription: ok\n---\n").errorType, "invalid-name-type");
+  assert.equal(parseFrontmatter("---\nname: ok\ndescription:\n  nested: true\n---\n").errorType, "invalid-description-type");
+});
+
 test("audits missing and weak descriptions", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-audit-"));
   const missingDir = path.join(tempRoot, "missing-description");
@@ -346,6 +573,24 @@ test("audit overlap ignores exclusion text", () => {
   );
 
   assert.ok(score < 0.45);
+});
+
+test("audit recognizes Chinese exclusion markers", () => {
+  for (const marker of ["不要", "不适用", "避免", "不要用于"]) {
+    const result = auditSkills({
+      skills: [
+        {
+          name: `zh-exclusion-${marker}`,
+          description: `用于优化网页布局和移动端显示。${marker} 数据库结构设计或后端接口权限检查。`,
+          path: `zh-exclusion-${marker}/SKILL.md`,
+          source: "custom",
+          status: "ok",
+        },
+      ],
+    });
+
+    assert.equal(result.issues.some((item) => item.type === "missing-exclusion"), false);
+  }
 });
 
 test("filters audit issues by severity", () => {
@@ -649,6 +894,243 @@ test("routes do not count exclusion text as positive evidence", () => {
   assert.equal(result.notRecommended[0].skill.name, "database-migration");
 });
 
+test("routes suppress obvious small local tasks", () => {
+  assert.equal(isSmallLocalTask("explain this one line of code"), true);
+  assert.equal(isSmallLocalTask("change one README sentence"), true);
+  assert.equal(isSmallLocalTask("write usage guide documentation"), false);
+
+  const result = routeTask("change one README sentence", {
+    skills: [
+      {
+        name: "docs-authoring",
+        description: "Use when writing documentation pages and README files.",
+        path: "docs-authoring/SKILL.md",
+        source: "custom",
+        status: "ok",
+      },
+    ],
+  });
+
+  assert.equal(result.suppressSmallTask, true);
+  assert.deepEqual(result.recommended, []);
+});
+
+test("extracts local route hints from openai yaml style objects", () => {
+  const hints = extractSkillHints(
+    {
+      routing: [
+        {
+          skill: "docs-authoring",
+          when: ["manual pages", "usage guide"],
+        },
+      ],
+    },
+    ["docs-authoring", "frontend-ui"],
+  );
+
+  assert.equal(hints.length, 1);
+  assert.equal(hints[0].skill, "docs-authoring");
+  assert.ok(hints[0].terms.includes("manual"));
+  assert.ok(hints[0].terms.includes("usage"));
+});
+
+test("loads route context from agents openai yaml", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-context-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "agents"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tempRoot, "agents", "openai.yaml"),
+    `routing:
+  - skill: docs-authoring
+    when:
+      - manual pages
+      - usage guide
+`,
+    "utf8",
+  );
+
+  const context = loadRouteContext({
+    cwd: tempRoot,
+    skills: [{ name: "docs-authoring" }],
+  });
+
+  assert.equal(context.contextFiles.length, 1);
+  assert.equal(context.skillHints.length, 1);
+  assert.equal(context.skillHints[0].skill, "docs-authoring");
+  assert.ok(context.skillHints[0].terms.includes("manual"));
+});
+
+test("routes use local context hints as explainable evidence", () => {
+  const result = routeTask(
+    "update the manual pages",
+    {
+      skills: [
+        {
+          name: "docs-authoring",
+          description: "Use when writing documentation pages and editing guides.",
+          path: "docs-authoring/SKILL.md",
+          source: "custom",
+          status: "ok",
+        },
+      ],
+    },
+    {
+      context: {
+        skillHints: [{ skill: "docs-authoring", terms: ["manual"] }],
+      },
+    },
+  );
+
+  assert.equal(result.recommended[0].skill.name, "docs-authoring");
+  assert.deepEqual(result.recommended[0].scoreDetails.contextMatches, ["manual"]);
+  assert.match(result.recommended[0].reasons.join(" "), /Local context matched: manual/);
+});
+
+test("routes prefer project skills over legacy skills when evidence ties", () => {
+  const result = routeTask("optimize frontend mobile layout", {
+    skills: [
+      {
+        name: "legacy-ui",
+        description: "Use when optimizing frontend mobile layout.",
+        path: "legacy-ui/SKILL.md",
+        source: "legacy",
+        status: "ok",
+      },
+      {
+        name: "project-ui",
+        description: "Use when optimizing frontend mobile layout.",
+        path: "project-ui/SKILL.md",
+        source: "project",
+        status: "ok",
+      },
+    ],
+  });
+
+  assert.equal(result.recommended[0].skill.name, "project-ui");
+  assert.ok(result.recommended[0].score > result.recommended[1].score);
+});
+
+test("routes understand Chinese exclusion markers", () => {
+  const result = routeTask("修改数据库结构", {
+    skills: [
+      {
+        name: "frontend-ui",
+        description: "用于优化网页布局和移动端显示。不要用于数据库结构、后端接口或权限检查。",
+        path: "frontend-ui/SKILL.md",
+        source: "custom",
+        status: "ok",
+      },
+    ],
+  });
+
+  assert.deepEqual(result.recommended, []);
+  assert.equal(result.notRecommended[0].scoreDetails.exclusionMatches.includes("database"), true);
+});
+
+test("loads eval cases from top-level cases yaml and json", () => {
+  const yamlCases = validateEvalCases(
+    parseEvalContent(`version: 1
+cases:
+  - id: strict-no-match
+    prompt: rename one variable
+    mode: strict
+    expected:
+      include: []
+      optional: []
+      exclude: []
+`, "eval.yml").cases,
+  );
+
+  assert.equal(yamlCases[0].id, "strict-no-match");
+  assert.equal(yamlCases[0].mode, "strict");
+
+  const jsonCases = validateEvalCases(
+    parseEvalContent(
+      JSON.stringify([
+        {
+          prompt: "deploy app",
+          expected: { include: ["deploy-skill"], exclude: [] },
+        },
+      ]),
+      "eval.json",
+    ),
+  );
+
+  assert.equal(jsonCases[0].mode, "permissive");
+  assert.deepEqual(jsonCases[0].expected.include, ["deploy-skill"]);
+});
+
+test("validates eval case errors", () => {
+  assert.throws(
+    () => validateEvalCases([{ id: "x", prompt: "", expected: { include: [] } }]),
+    /prompt/,
+  );
+  assert.throws(
+    () => validateEvalCases([{ id: "x", prompt: "task", mode: "exact", expected: { include: [] } }]),
+    /mode/,
+  );
+  assert.throws(
+    () => validateEvalCases([{ id: "x", prompt: "task", expected: { include: "skill" } }]),
+    /expected\.include/,
+  );
+  assert.throws(
+    () => validateEvalCases([{ id: "x", prompt: "task", expected: { include: ["a"], exclude: ["a"] } }]),
+    /include 和 exclude/,
+  );
+  assert.throws(
+    () =>
+      validateEvalCases([
+        { id: "x", prompt: "one", expected: { include: [] } },
+        { id: "x", prompt: "two", expected: { include: [] } },
+      ]),
+    /ID 重复/,
+  );
+});
+
+test("computes reliable eval metrics from fixed cases", () => {
+  const scanResult = {
+    skills: [
+      {
+        name: "deploy-skill",
+        description: "Use when deploying an app and creating a deployment link.",
+        path: "deploy-skill/SKILL.md",
+        source: "custom",
+        status: "ok",
+      },
+      {
+        name: "docs-authoring",
+        description: "Use when writing documentation pages and README files.",
+        path: "docs-authoring/SKILL.md",
+        source: "custom",
+        status: "ok",
+      },
+    ],
+  };
+  const result = evaluateRoutes(
+    [
+      {
+        id: "deploy",
+        prompt: "deploy app link",
+        mode: "permissive",
+        expected: { include: ["deploy-skill"], optional: [], exclude: ["docs-authoring"] },
+      },
+      {
+        id: "no-match",
+        prompt: "rename local variable",
+        mode: "strict",
+        expected: { include: [], optional: [], exclude: [] },
+      },
+    ],
+    scanResult,
+  );
+
+  assert.equal(result.summary.total, 2);
+  assert.equal(result.metrics.requiredRecall, 1);
+  assert.equal(result.metrics.exclusionAccuracy, 1);
+  assert.equal(result.metrics.noMatchAccuracy, 1);
+  assert.equal(result.skillMetrics["deploy-skill"].requiredHits, 1);
+});
+
 test("evaluates route cases from json", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-"));
   const skillDir = path.join(tempRoot, "deploy-skill");
@@ -683,10 +1165,10 @@ description: Use when deploying an app and creating a deployment link.
 
   const output = run(["eval", evalFile, "--path", tempRoot]);
 
-  assert.match(output, /csr eval/);
-  assert.match(output, /总测试数: 1/);
+  assert.match(output, /Routing Eval/);
+  assert.match(output, /测试总数: 1/);
   assert.match(output, /完全正确: 1/);
-  assert.match(output, /必须调用 Skill 命中率: 100%/);
+  assert.match(output, /Required Recall: 100\.0%/);
 });
 
 test("evaluates route cases as json output", () => {
@@ -725,8 +1207,9 @@ description: Use when deploying an app and creating a deployment link.
 
   assert.equal(parsed.total, 1);
   assert.equal(parsed.complete, 1);
-  assert.equal(parsed.includeHitRate, 1);
-  assert.equal(parsed.excludeCorrectRate, 1);
+  assert.equal(parsed.metrics.requiredRecall, 1);
+  assert.equal(parsed.metrics.exclusionAccuracy, 1);
+  assert.equal(parsed.summary.total, 1);
   assert.deepEqual(parsed.results[0].optionalHits, []);
   assert.deepEqual(parsed.results[0].recommended, ["deploy-skill"]);
 });
@@ -765,7 +1248,8 @@ description: Use when deploying an app and creating a deployment link.
   const result = runFailure(["eval", evalFile, "--path", tempRoot, "--min-complete-rate", "1"]);
 
   assert.equal(result.status, 1);
-  assert.match(result.output, /below required/);
+  assert.match(result.output, /质量门槛未通过/);
+  assert.match(result.output, /Complete Case Rate/);
 });
 
 test("eval rejects invalid complete rate threshold", () => {
@@ -775,14 +1259,82 @@ test("eval rejects invalid complete rate threshold", () => {
   assert.match(result.output, /min-complete-rate/);
 });
 
-test("example eval file has thirty reproducible cases", () => {
+test("eval writes markdown report", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-report-"));
+  const reportPath = path.join(tempRoot, "report.md");
+
+  const output = run(["eval", "examples/eval.yml", "--output", reportPath, "--path", "examples/skills"]);
+  const report = fs.readFileSync(reportPath, "utf8");
+
+  assert.match(output, /Routing Eval/);
+  assert.match(report, /# Codex Skill Router Eval Report/);
+  assert.match(report, /Required Recall/);
+  assert.doesNotMatch(report, new RegExp(tempRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("eval supports new threshold options", () => {
+  const output = run([
+    "eval",
+    "examples/eval.yml",
+    "--path",
+    "examples/skills",
+    "--min-required-recall",
+    "1",
+    "--min-exclusion-accuracy",
+    "1",
+  ]);
+
+  assert.match(output, /Required Recall: 100\.0%/);
+});
+
+test("eval fails when multiple thresholds are not met", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csr-eval-multi-threshold-"));
+  writeSkill(
+    tempRoot,
+    "deploy-skill",
+    "deploy-skill",
+    "Use when deploying an app and creating a deployment link.",
+  );
+  const evalFile = path.join(tempRoot, "eval.json");
+  fs.writeFileSync(
+    evalFile,
+    JSON.stringify([
+      {
+        prompt: "deploy app link",
+        expected: {
+          include: ["missing-skill"],
+          exclude: ["deploy-skill"],
+        },
+      },
+    ]),
+    "utf8",
+  );
+
+  const result = runFailure([
+    "eval",
+    evalFile,
+    "--path",
+    tempRoot,
+    "--min-required-recall",
+    "1",
+    "--min-exclusion-accuracy",
+    "1",
+  ]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.output, /质量门槛未通过/);
+  assert.match(result.output, /Required Recall/);
+  assert.match(result.output, /Exclusion Accuracy/);
+});
+
+test("example eval file has fifty reproducible cases", () => {
   const output = run(["eval", "examples/eval.yml", "--json", "--path", "examples/skills"]);
   const parsed = JSON.parse(output);
 
-  assert.equal(parsed.total, 30);
-  assert.equal(parsed.complete, 30);
-  assert.equal(parsed.includeHitRate, 1);
-  assert.equal(parsed.excludeCorrectRate, 1);
+  assert.equal(parsed.summary.total, 50);
+  assert.equal(parsed.summary.noMatch, 10);
+  assert.equal(parsed.metrics.requiredRecall, 1);
+  assert.equal(parsed.metrics.exclusionAccuracy, 1);
 });
 
 test("evaluates route cases from simple yaml", () => {
@@ -816,6 +1368,6 @@ expected:
 
   const output = run(["eval", evalFile, "--path", tempRoot]);
 
-  assert.match(output, /总测试数: 1/);
+  assert.match(output, /测试总数: 1/);
   assert.match(output, /完全正确: 1/);
 });

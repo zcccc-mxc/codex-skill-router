@@ -18,6 +18,12 @@ This project has not published a stable release yet.
 - Implemented `csr route` for local keyword-based routing prediction.
 - Implemented `csr eval` for JSON and simple YAML route test files.
 - Improved `csr scan` with summary counts and JSON output.
+- Updated default scan discovery to prefer `.agents/skills`, walking upward to the Git root, plus `$HOME/.agents/skills` and existing Linux/macOS `/etc/codex/skills`.
+- Marked compatible legacy `.codex/skills` and `skills` directories as `legacy`.
+- Replaced hand-written YAML parsing with the `yaml` package for Skill frontmatter and Eval files.
+- Added strict/permissive Eval modes, no-match cases, richer metrics, Markdown reports, and quality gates.
+- Expanded the sample Eval set to 50 cases, including 10 strict no-match cases.
+- Reduced no-match over-triggering by suppressing obvious small local tasks such as one-line explanations, one-sentence edits, variable renames, and tiny formatting changes.
 - Kept `csr scan --hide-paths` as a compatibility option.
 - Changed CLI output to hide local filesystem paths by default, with `--show-paths` for explicit local debugging.
 - Added `csr scan --brief` for compact scan output.
@@ -25,6 +31,8 @@ This project has not published a stable release yet.
 - Improved `csr route` scoring with name matches, description matches, exclusion penalties, and broad-description penalties.
 - Improved `csr route` description understanding with English synonyms and semantic concept hints.
 - Improved `csr route` matching with simple English stemming and phrase-level concept detection.
+- Added local route context hints from optional `agents/openai.yaml` and `.agents/openai.yaml` files.
+- Added source priority so project-level Skills can win close ties over user, custom, and legacy Skills.
 - Reduced `csr route` false positives from generic check, test, review, validation, browser, page, and data terms.
 - Reduced false positives by preventing exclusion text from being counted as positive route evidence.
 - Reduced audit overlap false positives by comparing applicability text separately from exclusion text.
@@ -45,9 +53,8 @@ This project has not published a stable release yet.
 
 ### Known Limitations
 
-- `route` uses simple keyword matching and a small Chinese-English keyword map.
+- `route` is still a local rule-based prediction and cannot know Codex internal Skill decisions.
 - `audit` uses rule-based checks and may produce conservative suggestions.
-- YAML support in `eval` is intentionally limited to the simple test format used by this project.
 - There is no npm package release yet.
 
 ## v0.1.0

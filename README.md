@@ -27,7 +27,7 @@ Current implementation status:
 
 - `scan`: implemented for local `SKILL.md` discovery and frontmatter reading.
 - `audit`: implemented for basic configuration checks.
-- `route`: implemented for local recommendations with explainable scoring, basic description understanding, and phrase-level matching.
+- `route`: implemented for local recommendations with explainable scoring, basic description understanding, phrase-level matching, local context hints, and project/user/source priority.
 - `eval`: implemented for JSON and simple YAML test files, including include, exclude, optional, and threshold checks.
 
 ## Try The Current CLI Shell
@@ -49,12 +49,105 @@ node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示
 node src/cli.js route "optimize frontend mobile layout" --path ./examples/skills
 node src/cli.js eval ./examples/eval.yml --path ./examples/skills
 node src/cli.js eval ./examples/eval.yml --json --path ./examples/skills
+node src/cli.js eval ./examples/eval.yml --output ./tmp-eval-report.md --path ./examples/skills
+node src/cli.js eval ./examples/eval.yml --min-required-recall 1 --path ./examples/skills
 node src/cli.js eval ./examples/eval.yml --min-complete-rate 1 --path ./examples/skills
 ```
 
 Path privacy: CLI output hides local filesystem paths by default, including common local path fragments inside Skill descriptions. Use `--show-paths` only when you intentionally need full paths for local debugging.
 
-The repository sample Eval file contains 30 routing tasks and uses only the public sample Skills under `examples/skills`.
+Default scan behavior:
+
+- walks upward from the current working directory looking for `.agents/skills`;
+- stops at the current Git repository root;
+- scans the user-level `$HOME/.agents/skills`;
+- on Linux/macOS, also checks `/etc/codex/skills` when that directory exists;
+- keeps legacy `.codex/skills` and `skills` directories, but marks their Skills as `legacy`;
+- keeps `--path` for explicit custom directories.
+
+The repository sample Eval file contains 50 routing tasks and uses only the public sample Skills under `examples/skills`.
+
+## Local Route Context
+
+`csr route` remains local-only and does not call Codex internals, AI services, MCP servers, or external APIs.
+
+When available, it can use small local context hints to improve recommendations:
+
+- `agents/openai.yaml`
+- `.agents/openai.yaml`
+- `package.json` dependency and script terms
+
+Example context file:
+
+```yaml
+routing:
+  - skill: docs-authoring
+    when:
+      - manual pages
+      - usage guide
+```
+
+These hints are only used as explainable evidence when the user task contains matching terms. They do not modify Skills and do not replace the Skill `description`.
+
+## Eval Files
+
+`csr eval` supports `.yml`, `.yaml`, and `.json`. YAML files use standard YAML parsing, so folded text, literal text, arrays, nested metadata, and quoted strings are supported.
+
+Recommended format:
+
+```yaml
+version: 1
+
+cases:
+  - id: frontend-mobile
+    prompt: optimize frontend mobile layout
+    mode: permissive
+    category: frontend
+    expected:
+      include:
+        - frontend-ui
+      optional:
+        - browser-validation
+      exclude:
+        - database-migration
+    reason: Existing page layout work should use frontend UI support.
+```
+
+For compatibility, the top level may also be a YAML or JSON array of cases.
+
+Eval modes:
+
+- `permissive`: `include` must be recommended, `exclude` must not be recommended, `optional` may appear, and other recommendations are allowed.
+- `strict`: `include` must be recommended, `exclude` must not be recommended, `optional` may appear, and any recommendation outside `include + optional` is counted as unexpected.
+- no-match tests use `mode: strict` with empty `include`, `optional`, and `exclude`; they pass only when no Skill is recommended.
+
+Eval metrics:
+
+- Required Recall: included Skills that were recommended divided by all listed `include` Skills.
+- Exclusion Accuracy: listed `exclude` Skills that were correctly not recommended.
+- Exact Set Match: strict cases where recommendations match only required plus hit optional Skills.
+- Unexpected Recommendation Rate: unexpected strict recommendations divided by all strict recommendations.
+- No-Match Accuracy: no-match cases that returned no recommendations.
+- Average Selected Skills: average number of recommended Skills per case.
+- Complete Case Rate: complete cases divided by all cases.
+
+Quality gates:
+
+```bash
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-required-recall 1
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-exclusion-accuracy 1
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-exact-match 0.8
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-no-match-accuracy 0.8
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills --max-unexpected-rate 1
+```
+
+Markdown report:
+
+```bash
+node src/cli.js eval ./examples/eval.yml --output ./tmp-eval-report.md --path ./examples/skills
+```
+
+The sample Eval file currently contains 50 routing tasks, including 10 strict no-match cases.
 
 To test the package-style `csr` command locally:
 
