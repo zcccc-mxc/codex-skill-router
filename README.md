@@ -104,6 +104,7 @@ The first version will not include:
 
 - [Contributing Guide](CONTRIBUTING.md)
 - [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)
+- [Codex Skill Router 使用说明](docs/Codex%20Skill%20Router%20使用说明.md)
 - [Project Collaboration Rules](AGENTS.md)
 
 ## Planned v0.1.0 Release Criteria
