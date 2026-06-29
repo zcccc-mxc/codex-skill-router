@@ -2,63 +2,68 @@
 
 All notable changes to Codex Skill Router will be documented in this file.
 
-This project has not published a stable release yet.
+## [Unreleased]
 
-## Unreleased
+- No unreleased changes yet.
+
+## [0.1.0-rc.1] - 2026-06-29
 
 ### Added
 
-- Created the initial open source project documentation.
-- Added product requirements for the v0.1.0 direction.
-- Added project collaboration rules in `AGENTS.md`.
-- Added `README.md`, `LICENSE`, `.gitignore`, and `CONTRIBUTING.md`.
-- Added a minimal Node.js CLI entrypoint for `csr`.
-- Implemented `csr scan` for local, read-only `SKILL.md` discovery.
-- Implemented `csr audit` for basic Skill configuration checks.
-- Implemented `csr route` for local keyword-based routing prediction.
-- Implemented `csr eval` for JSON and simple YAML route test files.
-- Improved `csr scan` with summary counts and JSON output.
-- Updated default scan discovery to prefer `.agents/skills`, walking upward to the Git root, plus `$HOME/.agents/skills` and existing Linux/macOS `/etc/codex/skills`.
-- Marked compatible legacy `.codex/skills` and `skills` directories as `legacy`.
-- Replaced hand-written YAML parsing with the `yaml` package for Skill frontmatter and Eval files.
-- Added strict/permissive Eval modes, no-match cases, richer metrics, Markdown reports, and quality gates.
-- Expanded the sample Eval set to 50 cases, including 10 strict no-match cases.
-- Reduced no-match over-triggering by suppressing obvious small local tasks such as one-line explanations, one-sentence edits, variable renames, and tiny formatting changes.
-- Kept `csr scan --hide-paths` as a compatibility option.
-- Changed CLI output to hide local filesystem paths by default, with `--show-paths` for explicit local debugging.
-- Added `csr scan --brief` for compact scan output.
-- Added `csr audit --severity` to focus on error, warning, or info issues.
-- Improved `csr route` scoring with name matches, description matches, exclusion penalties, and broad-description penalties.
-- Improved `csr route` description understanding with English synonyms and semantic concept hints.
-- Improved `csr route` matching with simple English stemming and phrase-level concept detection.
-- Added local route context hints from optional `agents/openai.yaml` and `.agents/openai.yaml` files.
-- Added source priority so project-level Skills can win close ties over user, custom, and legacy Skills.
-- Reduced `csr route` false positives from generic check, test, review, validation, browser, page, and data terms.
-- Reduced false positives by preventing exclusion text from being counted as positive route evidence.
-- Reduced audit overlap false positives by comparing applicability text separately from exclusion text.
-- Added `csr eval --json` for machine-readable evaluation results.
-- Added `csr eval --min-complete-rate` to fail evaluation runs below a required complete rate.
-- Added optional expectation handling for `csr eval`.
-- Added `examples/eval.yml` with 30 reproducible routing tasks and public sample Skills under `examples/skills`.
-- Added GitHub Actions CI for Node.js tests on Linux, Windows, and macOS.
-- Added Node.js built-in tests for the core CLI behavior.
+- Added `csr scan` for local, read-only `SKILL.md` discovery.
+- Added `csr audit` for Skill metadata quality checks.
+- Added `csr route` for explainable local routing prediction.
+- Added `csr eval` for routing regression tests.
+- Added `csr budget` for rough local Skill metadata budget estimates.
+- Added standard YAML parsing for Skill frontmatter and Eval files.
+- Added strict and permissive Eval modes.
+- Added no-match Eval cases.
+- Added Required Recall, Exclusion Accuracy, Exact Set Match, Unexpected Recommendation Rate, No-Match Accuracy, and Complete Case Rate.
+- Added Markdown Eval reports.
+- Added Eval quality gates.
+- Added optional local context hints from `agents/openai.yaml` and `.agents/openai.yaml`.
+- Added source priority so project-level Skills can win close ties.
+- Added JSON output with `schemaVersion`.
+- Added GitHub Actions configuration for Linux, Windows, and macOS.
+- Added release checklist and release notes draft.
 
-### Safety Notes
+### Changed
 
-- The current implementation is local-first.
-- The current implementation does not call external AI services.
-- The current implementation does not upload Skill contents.
-- The current implementation does not modify user Skill files.
-- `route` output is a local prediction and does not represent Codex internal execution.
+- Updated default scanning to prefer `.agents/skills`, walking upward to the Git root.
+- Kept `$HOME/.agents/skills` and optional Linux/macOS `/etc/codex/skills`.
+- Marked `.codex/skills` and `skills` as legacy compatibility locations.
+- Hid local filesystem paths by default.
+- Expanded public sample Eval coverage to 50 cases.
+- Updated package metadata for `0.1.0-rc.1`.
+- Rewrote README documentation to match implemented behavior.
 
-### Known Limitations
+### Fixed
 
-- `route` is still a local rule-based prediction and cannot know Codex internal Skill decisions.
-- `audit` uses rule-based checks and may produce conservative suggestions.
-- There is no npm package release yet.
+- Fixed scan path expectations for the current Codex standard location.
+- Fixed YAML parsing limitations from earlier hand-written parsing.
+- Fixed false positives from exclusion text being counted as positive route evidence.
+- Fixed Chinese exclusion marker handling.
+- Fixed generic route terms causing over-triggering.
+- Fixed Eval false-positive and false-negative metric reporting.
+- Fixed README claims about dependencies, YAML support, and sample case counts.
+
+### Security
+
+- The CLI remains local-first.
+- The CLI does not call external AI services.
+- The CLI does not upload Skill contents.
+- The CLI does not modify user Skill files.
+- Default text and JSON output hide local paths.
+
+### Known limitations
+
+- Local prediction is not Codex actual Skill invocation.
+- The router is rule-based and has limited semantic understanding.
+- Dependency declarations are not dependency availability checks.
+- `budget` is a rough estimate, not real token accounting.
+- The tool does not automatically rewrite user Skills.
+- The tool does not connect to external AI services.
 
 ## v0.1.0
 
-Planned first release.
-
-Release criteria are documented in [docs/PRODUCT_REQUIREMENTS.md](docs/PRODUCT_REQUIREMENTS.md).
+Planned first stable release after release-candidate validation.

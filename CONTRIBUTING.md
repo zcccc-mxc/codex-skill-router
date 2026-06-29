@@ -1,109 +1,68 @@
 # Contributing to Codex Skill Router
 
-Thanks for your interest in Codex Skill Router.
+Thanks for helping improve Codex Skill Router.
 
-This project is currently in the planning stage. Before contributing code, please read:
+## Scope
 
-- [README.md](README.md)
-- [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)
-- [Project Collaboration Rules](AGENTS.md)
-
-## Project Scope
-
-The first version focuses only on four planned commands:
+The `0.1.0-rc.1` scope is limited to:
 
 - `csr scan`
 - `csr audit`
 - `csr route`
 - `csr eval`
+- `csr budget`
 
-Please do not add large features outside this scope for v0.1.0.
+Please do not add SaaS features, login, databases, web dashboards, required external AI, MCP servers, or automatic Skill rewriting in this release line.
 
-## Good First Contributions
+## Development Setup
 
-Helpful contributions at this stage include:
+```bash
+npm ci
+npm test
+node src/cli.js --help
+```
 
-- improving product wording;
-- clarifying user scenarios;
-- adding realistic routing test ideas;
-- finding unclear or conflicting requirements;
-- suggesting simple acceptance criteria;
-- improving documentation structure.
+There is no build step and no TypeScript typecheck in the current JavaScript implementation.
 
-## Please Avoid For Now
+## Testing
 
-Please do not add these in early contributions unless they have been discussed first:
+Run:
 
-- SaaS features;
-- login or account systems;
-- databases;
-- web admin dashboards;
-- required external AI providers;
-- automatic modification of user Skills;
-- MCP server implementation;
-- adapters for other coding agents;
-- complex security scanners.
+```bash
+npm test
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-complete-rate 1
+```
 
-## Product Principles
+New core behavior should include focused tests in `test/cli.test.js`.
 
-Contributions should preserve these principles:
+## Turning a Routing Mistake into an Eval Case
 
-- local first;
-- read-only by default;
-- explainable results;
-- honest limits about local prediction versus Codex internal behavior;
-- no required external AI for the first version;
-- simple and stable before broad feature coverage.
+If `csr route` recommends the wrong Skill:
 
-## Documentation Style
+1. Save the user task as `prompt`.
+2. Put required Skills in `expected.include`.
+3. Put acceptable extra Skills in `expected.optional`.
+4. Put wrong Skills in `expected.exclude`.
+5. Choose `strict` when no unexpected Skills should appear.
+6. Add the case to `examples/eval.yml` only when it is a general, non-private example.
 
-Documentation should be clear enough for non-programmers to understand.
+Do not submit private Skill contents, private paths, company internals, secrets, logs, or local cache files.
 
-Prefer:
+## Pull Requests
 
-- plain language;
-- concrete examples;
-- short sections;
-- clear acceptance criteria;
-- explicit risks and limitations.
+Before opening a PR:
 
-Avoid:
-
-- unexplained technical jargon;
-- vague promises;
-- claiming the tool can control Codex internal routing;
-- adding implementation detail before product behavior is clear.
-
-## Code Contributions
-
-Code contributions are not the focus until the project planning documents are stable.
-
-When code work begins, every core feature should include:
-
-- focused tests;
-- clear error messages;
-- type checking;
-- build verification;
-- no hidden network dependency;
-- no default writes to user Skill files.
-
-## Pull Request Checklist
-
-Before opening a pull request, check:
-
-- The change matches the current project scope.
-- No private paths, secrets, logs, cache files, or build outputs are included.
-- Documentation uses clear language.
-- New behavior has an acceptance path a non-programmer can follow.
-- Out-of-scope ideas are marked as future roadmap, not v0.1.0 work.
+- run `npm test`;
+- verify README command examples still work;
+- verify no private paths or secrets are included;
+- update docs for user-facing behavior changes;
+- keep local-first and read-only behavior intact.
 
 ## Communication
 
-When proposing changes, explain:
+Explain:
 
-1. what problem the change solves;
-2. who benefits from it;
-3. what changed;
-4. how to review it;
-5. any known risks or limits.
-
+- what problem changed;
+- how to test it;
+- which files changed;
+- known limits or risks.

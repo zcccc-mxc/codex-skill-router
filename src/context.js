@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const YAML = require("yaml");
+const YAML = require("./yaml");
 const { findGitRoot } = require("./scan");
 const { tokenize } = require("./text");
 

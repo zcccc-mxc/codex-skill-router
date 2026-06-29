@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const YAML = require("yaml");
+const YAML = require("./yaml");
 
 const IGNORED_DIRS = new Set([".git", "node_modules", "dist", "build", "coverage"]);
 

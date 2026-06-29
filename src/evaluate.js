@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const YAML = require("yaml");
+const YAML = require("./yaml");
 const { routeTask } = require("./route");
 
 const VALID_MODES = new Set(["strict", "permissive"]);

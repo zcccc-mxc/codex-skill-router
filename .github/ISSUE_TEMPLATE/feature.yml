@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest a scoped improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: "For v0.1.x, please keep requests focused on scan, audit, route, eval, budget, packaging, or documentation."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance check
+      description: How should a non-programmer verify this works?

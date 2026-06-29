@@ -6,9 +6,11 @@ dist/
 build/
 coverage/
 *.tsbuildinfo
+*.tgz
 
 # Package manager caches
 .npm/
+.npm-cache/
 .pnpm-store/
 .yarn/
 
@@ -34,3 +36,4 @@ Thumbs.db
 tmp/
 temp/
 .cache/
+.tmp-install-*/

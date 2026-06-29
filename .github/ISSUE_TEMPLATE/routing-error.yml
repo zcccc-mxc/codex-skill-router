@@ -1,0 +1,79 @@
+name: Routing error
+description: Report a route recommendation that should become an Eval case.
+title: "[Routing]: "
+labels: ["routing", "eval-candidate"]
+body:
+  - type: markdown
+    attributes:
+      value: "Please anonymize private paths, secrets, company information, and Skill contents."
+  - type: input
+    id: version
+    attributes:
+      label: csr version
+      placeholder: "0.1.0-rc.1"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: Include the command you ran. Remove private paths.
+    validations:
+      required: true
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Task prompt
+    validations:
+      required: true
+  - type: textarea
+    id: available
+    attributes:
+      label: Available Skills
+      description: Skill names only are enough. Do not paste private Skill contents unless safe.
+  - type: textarea
+    id: include
+    attributes:
+      label: Expected include
+  - type: textarea
+    id: optional
+    attributes:
+      label: Expected optional
+  - type: textarea
+    id: exclude
+    attributes:
+      label: Expected exclude
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual recommendations
+    validations:
+      required: true
+  - type: dropdown
+    id: strict
+    attributes:
+      label: Should this be strict?
+      options:
+        - "yes"
+        - "no"
+        - "not sure"
+  - type: dropdown
+    id: explicit
+    attributes:
+      label: Did the task explicitly name a Skill?
+      options:
+        - "yes"
+        - "no"
+        - "not sure"

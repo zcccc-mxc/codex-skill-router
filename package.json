@@ -1,11 +1,39 @@
 {
   "name": "codex-skill-router",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.1",
   "description": "Local-first tool for checking, testing, and improving Codex Skill routing.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zcccc-mxc/codex-skill-router.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zcccc-mxc/codex-skill-router/issues"
+  },
+  "homepage": "https://github.com/zcccc-mxc/codex-skill-router#readme",
+  "keywords": [
+    "codex",
+    "skills",
+    "routing",
+    "cli",
+    "local-first"
+  ],
   "bin": {
     "csr": "./src/cli.js"
   },
+  "files": [
+    "src",
+    "docs",
+    "examples",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "RELEASE_CHECKLIST.md"
+  ],
   "scripts": {
     "start": "node src/cli.js",
     "test": "node --test"

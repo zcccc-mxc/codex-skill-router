@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+        node-version:
+          - 20
+          - 22
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify CLI help
+        run: |
+          node src/cli.js --help
+          node src/cli.js scan --help
+          node src/cli.js audit --help
+          node src/cli.js route --help
+          node src/cli.js eval --help
+          node src/cli.js budget --help
+
+      - name: Verify sample commands
+        run: |
+          node src/cli.js scan --path ./examples/skills
+          node src/cli.js audit --path ./examples/skills
+          node src/cli.js route "optimize existing page and check mobile display" --path ./examples/skills
+          node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-complete-rate 1
+          node src/cli.js budget --path ./examples/skills
+
+      - name: Verify package contents
+        run: npm pack --dry-run

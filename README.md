@@ -1,83 +1,193 @@
 # Codex Skill Router
 
-Codex Skill Router is a local-first tool concept for checking, testing, and improving how Codex Skills are selected for different tasks.
+[中文说明](README.zh-CN.md)
 
-中文定位：
+Codex Skill Router is a local-first CLI for inspecting, auditing, predicting, testing, and explaining Codex Skill routing quality.
 
-```text
-帮助用户检查、测试和改进 Codex Skills 的自动选择效果。
-```
+Codex already has its own Skill selection behavior. This project does **not** replace it, control it, or claim to know Codex internal decisions. It helps users answer a different question:
+
+> Are my local Skills discoverable, clearly described, and likely to route the way I expect?
 
 ## Current Status
 
-This project is in the early implementation stage.
+Version: `0.1.0-rc.1`
 
-At this stage, the repository contains product documents and a minimal CLI. The four core commands have basic local-first implementations.
+Implemented commands:
 
-## What It Will Do
+- `csr scan`
+- `csr audit`
+- `csr route`
+- `csr eval`
+- `csr budget`
 
-The first version is planned around four commands:
+The tool is local-only, read-only by default, and does not call external AI services or APIs.
 
-- `csr scan`: scan project-level and user-level Skills.
-- `csr audit`: check whether Skill metadata and descriptions are clear enough.
-- `csr route`: predict which Skills are suitable for a user task.
-- `csr eval`: run prepared test cases to evaluate routing quality.
+## Installation
 
-Current implementation status:
-
-- `scan`: implemented for local `SKILL.md` discovery and frontmatter reading.
-- `audit`: implemented for basic configuration checks.
-- `route`: implemented for local recommendations with explainable scoring, basic description understanding, phrase-level matching, local context hints, and project/user/source priority.
-- `eval`: implemented for JSON and simple YAML test files, including include, exclude, optional, and threshold checks.
-
-## Try The Current CLI Shell
-
-No dependencies are required for the current CLI.
+For local development:
 
 ```bash
-node src/cli.js --help
-node src/cli.js scan
-node src/cli.js scan ./examples/skills
-node src/cli.js scan --path ./examples/skills
-node src/cli.js scan --json ./examples/skills
-node src/cli.js scan --show-paths ./examples/skills
-node src/cli.js scan --json --show-paths ./examples/skills
-node src/cli.js scan --brief ./examples/skills
-node src/cli.js audit ./examples/skills
-node src/cli.js audit --severity warning --path ./examples/skills
-node src/cli.js route "优化现有的 Next.js 页面，并检查移动端显示"
-node src/cli.js route "optimize frontend mobile layout" --path ./examples/skills
-node src/cli.js eval ./examples/eval.yml --path ./examples/skills
-node src/cli.js eval ./examples/eval.yml --json --path ./examples/skills
-node src/cli.js eval ./examples/eval.yml --output ./tmp-eval-report.md --path ./examples/skills
-node src/cli.js eval ./examples/eval.yml --min-required-recall 1 --path ./examples/skills
-node src/cli.js eval ./examples/eval.yml --min-complete-rate 1 --path ./examples/skills
+npm install
+npm test
 ```
 
-Path privacy: CLI output hides local filesystem paths by default, including common local path fragments inside Skill descriptions. Use `--show-paths` only when you intentionally need full paths for local debugging.
+To test the package-style command locally:
+
+```bash
+npm link
+csr --help
+```
+
+To remove the linked command later:
+
+```bash
+npm unlink -g codex-skill-router
+```
+
+## Five-Minute Quick Start
+
+Use the public sample Skills:
+
+```bash
+node src/cli.js scan --path ./examples/skills
+node src/cli.js audit --path ./examples/skills
+node src/cli.js route "optimize existing page and check mobile display" --path ./examples/skills
+node src/cli.js eval ./examples/eval.yml --path ./examples/skills
+node src/cli.js budget --path ./examples/skills
+```
+
+Expected sample Eval status:
+
+```text
+Total cases: 50
+complete: 50
+failed: 0
+```
+
+## scan
+
+`scan` discovers local `SKILL.md` files and reads their YAML frontmatter.
+
+```bash
+csr scan
+csr scan --path ./examples/skills
+csr scan --json --path ./examples/skills
+csr scan --brief --path ./examples/skills
+csr scan --show-paths --path ./examples/skills
+```
 
 Default scan behavior:
 
 - walks upward from the current working directory looking for `.agents/skills`;
 - stops at the current Git repository root;
-- scans the user-level `$HOME/.agents/skills`;
-- on Linux/macOS, also checks `/etc/codex/skills` when that directory exists;
-- keeps legacy `.codex/skills` and `skills` directories, but marks their Skills as `legacy`;
+- scans `$HOME/.agents/skills`;
+- on Linux/macOS, also checks `/etc/codex/skills` when it exists;
+- keeps legacy `.codex/skills` and `skills` directories, marked as `legacy`;
 - keeps `--path` for explicit custom directories.
 
-The repository sample Eval file contains 50 routing tasks and uses only the public sample Skills under `examples/skills`.
+Paths are hidden by default. Use `--show-paths` only for local debugging.
+
+## audit
+
+`audit` checks Skill metadata quality.
+
+```bash
+csr audit --path ./examples/skills
+csr audit --severity warning --path ./examples/skills
+```
+
+It detects issues such as missing `name`, missing `description`, short or vague descriptions, missing use conditions, missing exclusion conditions, duplicate names, and likely overlap.
+
+## route
+
+`route` predicts which Skills may fit a task and explains why.
+
+```bash
+csr route "check login authorization bypass" --path ./examples/skills
+csr route "only update README installation instructions" --path ./examples/skills
+```
+
+Routing uses local rule-based evidence:
+
+- Skill name matches;
+- Skill description matches;
+- exclusion text penalties;
+- broad-description penalties;
+- simple word-form handling;
+- phrase-level concepts;
+- optional local context hints;
+- project/user/source priority.
+
+It is still a local prediction, not Codex internal execution.
+
+## eval
+
+`eval` runs route test cases.
+
+```bash
+csr eval ./examples/eval.yml --path ./examples/skills
+csr eval ./examples/eval.yml --json --path ./examples/skills
+csr eval ./examples/eval.yml --output ./tmp-eval-report.md --path ./examples/skills
+```
+
+Supported formats:
+
+- `.yml`
+- `.yaml`
+- `.json`
+
+YAML uses the `yaml` package and supports standard YAML features such as arrays, quoted strings, folded text, and nested metadata.
+
+Eval supports:
+
+- `strict` and `permissive` modes;
+- `include`;
+- `optional`;
+- `exclude`;
+- strict no-match cases;
+- Required Recall;
+- Exclusion Accuracy;
+- Exact Set Match;
+- Unexpected Recommendation Rate;
+- No-Match Accuracy;
+- Markdown reports;
+- quality gates.
+
+Quality gate examples:
+
+```bash
+csr eval ./examples/eval.yml --path ./examples/skills --min-complete-rate 1
+csr eval ./examples/eval.yml --path ./examples/skills --min-required-recall 1
+csr eval ./examples/eval.yml --path ./examples/skills --min-exclusion-accuracy 1
+csr eval ./examples/eval.yml --path ./examples/skills --min-no-match-accuracy 1
+```
+
+## budget
+
+`budget` estimates local Skill metadata size. It is only an estimate.
+
+```bash
+csr budget --path ./examples/skills
+csr budget --json --path ./examples/skills
+csr budget --max-tokens 12000 --path ./examples/skills
+```
+
+Important limits:
+
+- it does not use Codex internal token accounting;
+- it does not call a model;
+- it does not verify whether dependencies are installed or usable;
+- it estimates from local Skill metadata length.
 
 ## Local Route Context
 
-`csr route` remains local-only and does not call Codex internals, AI services, MCP servers, or external APIs.
-
-When available, it can use small local context hints to improve recommendations:
+`route` can read optional local context hints:
 
 - `agents/openai.yaml`
 - `.agents/openai.yaml`
 - `package.json` dependency and script terms
 
-Example context file:
+Example:
 
 ```yaml
 routing:
@@ -87,139 +197,91 @@ routing:
       - usage guide
 ```
 
-These hints are only used as explainable evidence when the user task contains matching terms. They do not modify Skills and do not replace the Skill `description`.
+These hints are only used as explainable evidence when task terms match. They do not modify Skills and do not replace the Skill `description`.
 
-## Eval Files
+Dependency names from `package.json` are treated as declarations only. The router does not verify that a dependency works at runtime.
 
-`csr eval` supports `.yml`, `.yaml`, and `.json`. YAML files use standard YAML parsing, so folded text, literal text, arrays, nested metadata, and quoted strings are supported.
+## JSON Output
 
-Recommended format:
+Commands with `--json` return parseable JSON without ANSI color codes. JSON includes:
 
-```yaml
-version: 1
-
-cases:
-  - id: frontend-mobile
-    prompt: optimize frontend mobile layout
-    mode: permissive
-    category: frontend
-    expected:
-      include:
-        - frontend-ui
-      optional:
-        - browser-validation
-      exclude:
-        - database-migration
-    reason: Existing page layout work should use frontend UI support.
+```json
+{
+  "schemaVersion": 1,
+  "command": "scan",
+  "success": true,
+  "summary": {},
+  "data": {},
+  "warnings": [],
+  "errors": []
+}
 ```
 
-For compatibility, the top level may also be a YAML or JSON array of cases.
+Backward-compatible top-level fields may also be present. The schema may evolve by `schemaVersion`.
 
-Eval modes:
+## Exit Codes
 
-- `permissive`: `include` must be recommended, `exclude` must not be recommended, `optional` may appear, and other recommendations are allowed.
-- `strict`: `include` must be recommended, `exclude` must not be recommended, `optional` may appear, and any recommendation outside `include + optional` is counted as unexpected.
-- no-match tests use `mode: strict` with empty `include`, `optional`, and `exclude`; they pass only when no Skill is recommended.
-
-Eval metrics:
-
-- Required Recall: included Skills that were recommended divided by all listed `include` Skills.
-- Exclusion Accuracy: listed `exclude` Skills that were correctly not recommended.
-- Exact Set Match: strict cases where recommendations match only required plus hit optional Skills.
-- Unexpected Recommendation Rate: unexpected strict recommendations divided by all strict recommendations.
-- No-Match Accuracy: no-match cases that returned no recommendations.
-- Average Selected Skills: average number of recommended Skills per case.
-- Complete Case Rate: complete cases divided by all cases.
-
-Quality gates:
-
-```bash
-node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-required-recall 1
-node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-exclusion-accuracy 1
-node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-exact-match 0.8
-node src/cli.js eval ./examples/eval.yml --path ./examples/skills --min-no-match-accuracy 0.8
-node src/cli.js eval ./examples/eval.yml --path ./examples/skills --max-unexpected-rate 1
+```text
+0 = success
+1 = runtime error
+2 = user input or configuration error
+3 = eval quality gate failed
 ```
 
-Markdown report:
+Audit findings do not fail the process by default.
+
+## Privacy
+
+By default, CLI output hides local paths, including common absolute path fragments in Skill descriptions.
+
+The tool does not upload:
+
+- Skill contents;
+- local paths;
+- task prompts;
+- Eval data;
+- project code.
+
+Use `--show-paths` only when you intentionally need local paths for debugging.
+
+## Development Commands
 
 ```bash
-node src/cli.js eval ./examples/eval.yml --output ./tmp-eval-report.md --path ./examples/skills
-```
-
-The sample Eval file currently contains 50 routing tasks, including 10 strict no-match cases.
-
-To test the package-style `csr` command locally:
-
-```bash
-npm link
-csr --help
-csr eval ./examples/eval.yml --path ./examples/skills --min-complete-rate 1
-```
-
-Use `npm unlink -g codex-skill-router` when you no longer need the linked command.
-
-Run tests:
-
-```bash
+npm ci
 npm test
+node src/cli.js --help
+node src/cli.js scan --help
+node src/cli.js audit --help
+node src/cli.js route --help
+node src/cli.js eval --help
+node src/cli.js budget --help
+npm pack --dry-run
 ```
 
-On Windows PowerShell, if `npm test` is blocked by script policy, use:
+There is no build step and no TypeScript typecheck in this JavaScript project.
 
-```bash
-npm.cmd test
-```
+## Current Limitations
 
-## What It Will Not Do In v0.1.0
+- Local prediction is not Codex actual Skill invocation.
+- The router is rule-based and has limited semantic understanding.
+- Dependency declarations are not dependency availability checks.
+- `budget` is a rough estimate, not real token accounting.
+- The tool does not modify user Skills.
+- The tool does not connect to external AI services.
 
-The first version will not include:
+## Contributing
 
-- user login;
-- cloud server;
-- database;
-- SaaS dashboard;
-- web admin UI;
-- Skill marketplace;
-- automatic control of Codex internal decisions;
-- required external AI or API keys;
-- automatic modification of user Skills.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Product Principles
+Routing mistakes are especially useful when converted into Eval cases.
 
-- Local first: user Skill content, paths, prompts, test data, and project code should not be uploaded by default.
-- Read-only by default: the first version must not modify user Skills.
-- Explainable: results must explain why a Skill is recommended or excluded.
-- Honest limits: local routing prediction is not the same as Codex internal execution.
-- Simple first: v0.1.0 should focus on reliable `scan`, `audit`, `route`, and `eval`.
+## Roadmap
 
-## Documents
+Future ideas, not part of this release candidate:
 
-- [Contributing Guide](CONTRIBUTING.md)
-- [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)
-- [Codex Skill Router 使用说明](docs/Codex%20Skill%20Router%20使用说明.md)
-- [Project Collaboration Rules](AGENTS.md)
-
-## Planned v0.1.0 Release Criteria
-
-The first release should only happen after:
-
-- `scan` can discover real Skills;
-- `audit` can find basic configuration problems;
-- `route` can recommend Skills with explanations;
-- `eval` can run a test set;
-- core tests pass;
-- CI runs on GitHub Actions;
-- package-style `csr` command works through `npm link`;
-- README examples are executable;
-- no secrets or private paths are committed;
-- at least one demo sample exists;
-- at least 30 routing test tasks exist.
-
-## Maintainer Notes
-
-The project owner provides product direction, value judgment, real usage feedback, and acceptance checks.
-
-Codex handles technical planning, implementation, testing, fixes, and documentation maintenance.
-
-All explanations for the project owner should use clear, plain Chinese.
+- richer route comparison reports;
+- optional AI-assisted analysis;
+- Skill description rewrite suggestions with dry-run;
+- HTML reports;
+- team registries;
+- integrations with other agent systems.

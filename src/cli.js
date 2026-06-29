@@ -4,12 +4,20 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { version } = require("../package.json");
 const { auditSkills } = require("./audit");
+const { budgetSkills } = require("./budget");
 const { loadRouteContext } = require("./context");
 const { evaluateRoutes, loadEvalCases, renderMarkdownReport } = require("./evaluate");
 const { routeTask } = require("./route");
 const { scanSkills } = require("./scan");
 
-const COMMANDS = new Set(["scan", "audit", "route", "eval"]);
+const EXIT = {
+  OK: 0,
+  RUNTIME_ERROR: 1,
+  INPUT_ERROR: 2,
+  QUALITY_GATE_FAILED: 3,
+};
+
+const COMMANDS = new Set(["scan", "audit", "route", "eval", "budget"]);
 const AUDIT_SEVERITIES = new Set(["error", "warning", "info"]);
 const EVAL_THRESHOLDS = {
   "--min-complete-rate": { key: "completeCaseRate", direction: "min", label: "Complete Case Rate" },
@@ -23,65 +31,82 @@ const EVAL_THRESHOLDS = {
 function printHelp() {
   console.log(`Codex Skill Router (csr)
 
-用法:
-  csr <命令> [输入]
+Usage:
+  csr <command> [input]
 
-命令:
-  scan     扫描本地 Codex Skills。
-  audit    检查 Skill 配置质量。
-  route    根据任务预测适合的 Skills。
-  eval     使用测试集评估路由效果。
+Commands:
+  scan     Scan local Codex Skills.
+  audit    Check Skill metadata quality.
+  route    Predict suitable Skills for a task.
+  eval     Evaluate routing quality with test cases.
+  budget   Estimate local Skill metadata budget.
 
-选项:
-  -h, --help     显示帮助。
-  -v, --version  显示版本号。`);
+Options:
+  -h, --help     Show help.
+  -v, --version  Show version.
+
+Exit codes:
+  0 success
+  1 runtime error
+  2 user input or configuration error
+  3 eval quality gate failed`);
 }
 
 function printCommandHelp(command) {
   const helpText = {
     scan: `csr scan
 
-用法:
-  csr scan [路径]
-  csr scan --path <路径>
+Usage:
+  csr scan
+  csr scan --path <path>
 
-选项:
-  --json        输出 JSON。
-  --brief       隐藏 description，输出更短。
-  --show-paths  显示本地路径；默认隐藏。
-  --hide-paths  兼容选项；默认已经隐藏路径。`,
+Options:
+  --json        Output JSON.
+  --brief       Hide descriptions in text output.
+  --show-paths  Show local paths; hidden by default.
+  --hide-paths  Compatibility option; paths are hidden by default.`,
     audit: `csr audit
 
-用法:
-  csr audit [路径]
-  csr audit --path <路径>
+Usage:
+  csr audit
+  csr audit --path <path>
 
-选项:
-  --severity <error|warning|info>  只显示指定级别的问题。
-  --show-paths                    显示本地路径；默认隐藏。`,
+Options:
+  --severity <error|warning|info>  Show only one issue level.
+  --show-paths                    Show local paths; hidden by default.`,
     route: `csr route
 
-用法:
-  csr route "任务描述"
-  csr route "任务描述" --path <路径>
+Usage:
+  csr route "task description"
+  csr route "task description" --path <path>
 
-选项:
-  --show-paths  显示本地路径；默认隐藏。`,
+Options:
+  --show-paths  Show local paths; hidden by default.`,
     eval: `csr eval
 
-用法:
-  csr eval <测试文件>
-  csr eval <测试文件> --path <路径>
+Usage:
+  csr eval <eval-file>
+  csr eval <eval-file> --path <path>
 
-选项:
-  --json                         输出 JSON。
-  --output <report.md>           写入 Markdown 报告。
-  --min-complete-rate <0..1>     完全正确率门槛。
-  --min-required-recall <0..1>   Required Recall 门槛。
-  --min-exclusion-accuracy <0..1> Exclusion Accuracy 门槛。
-  --min-exact-match <0..1>       Exact Set Match 门槛。
-  --min-no-match-accuracy <0..1> No-Match Accuracy 门槛。
-  --max-unexpected-rate <0..1>   Unexpected Recommendation Rate 上限。`,
+Options:
+  --json                          Output JSON.
+  --output <report.md>            Write a Markdown report.
+  --min-complete-rate <0..1>      Complete Case Rate gate.
+  --min-required-recall <0..1>    Required Recall gate.
+  --min-exclusion-accuracy <0..1> Exclusion Accuracy gate.
+  --min-exact-match <0..1>        Exact Set Match gate.
+  --min-no-match-accuracy <0..1>  No-Match Accuracy gate.
+  --max-unexpected-rate <0..1>    Unexpected Recommendation Rate ceiling.`,
+    budget: `csr budget
+
+Usage:
+  csr budget
+  csr budget --path <path>
+
+Options:
+  --json                 Output JSON.
+  --show-paths           Show local paths; hidden by default.
+  --max-tokens <number>  Set estimate threshold. Default: 8000.`,
   };
 
   console.log(helpText[command]);
@@ -166,15 +191,34 @@ function redactLocalPaths(value) {
 function hideScanPaths(result) {
   return {
     ...result,
-    roots: result.roots.map(() => "(已隐藏)"),
-    missingRoots: result.missingRoots.map(() => "(已隐藏)"),
+    roots: result.roots.map(() => "(hidden path)"),
+    missingRoots: result.missingRoots.map(() => "(hidden path)"),
     skills: result.skills.map((skill) => ({
       ...skill,
-      path: "(已隐藏)",
+      path: "(hidden path)",
       description: redactLocalPaths(skill.description),
       message: redactLocalPaths(skill.message),
     })),
   };
+}
+
+function jsonEnvelope(command, data, options = {}) {
+  return {
+    schemaVersion: 1,
+    command,
+    success: options.success ?? true,
+    summary: data.summary || {},
+    data,
+    warnings: options.warnings || [],
+    errors: options.errors || [],
+
+    // Backward-compatible top-level fields for existing callers.
+    ...data,
+  };
+}
+
+function printJson(command, data, options = {}) {
+  console.log(JSON.stringify(jsonEnvelope(command, data, options), null, 2));
 }
 
 function printScanResult(result, options = {}) {
@@ -182,43 +226,43 @@ function printScanResult(result, options = {}) {
 
   console.log("csr scan");
   console.log("");
-  console.log(`发现 ${result.summary.total} 个 Skills`);
+  console.log(`Found ${result.summary.total} Skills`);
   console.log("");
-  console.log("Codex 标准位置:");
-  console.log(`- 项目级：${sources.project || 0}`);
-  console.log(`- 用户级：${sources.user || 0}`);
-  console.log(`- 管理员级：${sources.admin || 0}`);
+  console.log("Codex standard locations:");
+  console.log(`- project: ${sources.project || 0}`);
+  console.log(`- user: ${sources.user || 0}`);
+  console.log(`- admin: ${sources.admin || 0}`);
   console.log("");
-  console.log("兼容位置:");
-  console.log(`- legacy：${sources.legacy || 0}`);
+  console.log("Compatibility locations:");
+  console.log(`- legacy: ${sources.legacy || 0}`);
   if (sources.custom > 0) {
-    console.log(`- custom：${sources.custom}`);
+    console.log(`- custom: ${sources.custom}`);
   }
   if ((sources.legacy || 0) > 0) {
     console.log("");
-    console.log("提示:");
-    console.log("“项目/skills”不是当前 Codex 官方标准目录，");
-    console.log("建议迁移到“.agents/skills”。");
+    console.log("Tip:");
+    console.log('"project/skills" is not the current Codex standard directory.');
+    console.log('Prefer ".agents/skills".');
   }
   console.log("");
 
   if (result.skills.length === 0) {
-    console.log("没有找到可扫描的 Skills。请确认当前目录或用户 Skills 目录是否存在。");
+    console.log("No Skills found. Check the current directory, user Skill directory, or pass --path.");
     return;
   }
 
   for (const skill of result.skills) {
-    console.log(`- ${skill.name || "(未命名 Skill)"}`);
-    console.log(`  来源: ${skill.source}`);
-    console.log(`  路径: ${skill.path}`);
-    console.log(`  状态: ${skill.status === "ok" ? "正常" : "格式错误"}`);
+    console.log(`- ${skill.name || "(unnamed Skill)"}`);
+    console.log(`  source: ${skill.source}`);
+    console.log(`  path: ${skill.path}`);
+    console.log(`  status: ${skill.status === "ok" ? "ok" : "format-error"}`);
 
     if (!options.brief) {
-      console.log(`  描述: ${skill.description || "(缺少 description)"}`);
+      console.log(`  description: ${skill.description || "(missing description)"}`);
     }
 
     if (!options.brief && skill.message) {
-      console.log(`  提示: ${skill.message}`);
+      console.log(`  note: ${skill.message}`);
     }
 
     console.log("");
@@ -289,33 +333,33 @@ function filterAuditResult(result, severity) {
 function printAuditResult(result, options = {}) {
   console.log("csr audit");
   console.log("");
-  console.log(`检查 Skills: ${result.skillCount}`);
-  console.log(`发现问题: ${result.issueCount}`);
-  console.log(`严重问题: ${result.errorCount}`);
-  console.log(`建议修复: ${result.warningCount}`);
-  console.log(`提示信息: ${result.infoCount}`);
+  console.log(`Skills checked: ${result.skillCount}`);
+  console.log(`Issues found: ${result.issueCount}`);
+  console.log(`Errors: ${result.errorCount}`);
+  console.log(`Warnings: ${result.warningCount}`);
+  console.log(`Info: ${result.infoCount}`);
   if (options.severity) {
-    console.log(`筛选级别: ${options.severity}`);
-    console.log(`显示问题: ${result.visibleIssueCount}`);
+    console.log(`Severity filter: ${options.severity}`);
+    console.log(`Visible issues: ${result.visibleIssueCount}`);
   }
   console.log("");
 
   if (result.issueCount === 0) {
-    console.log("没有发现明显问题。");
+    console.log("No obvious issues found.");
     return;
   }
 
   if (options.severity && result.issues.length === 0) {
-    console.log("没有符合筛选条件的问题。");
+    console.log("No issues match the selected severity.");
     return;
   }
 
   for (const item of result.issues) {
     console.log(`- [${item.severity}] ${item.skill}`);
-    console.log(`  类型: ${item.type}`);
-    console.log(`  问题: ${item.message}`);
-    console.log(`  建议: ${item.suggestion}`);
-    console.log(`  路径: ${item.path}`);
+    console.log(`  type: ${item.type}`);
+    console.log(`  issue: ${item.message}`);
+    console.log(`  suggestion: ${item.suggestion}`);
+    console.log(`  path: ${item.path}`);
     console.log("");
   }
 }
@@ -353,39 +397,37 @@ function parseRouteArgs(args) {
 }
 
 function printRouteInputError() {
-  console.error(`csr route 需要一段任务描述。
-示例:
-  csr route "优化现有的 Next.js 页面，并检查移动端显示"`);
+  console.error('csr route needs a task description. Example: csr route "optimize frontend mobile layout"');
 }
 
 function printRouteResult(result) {
   console.log("csr route");
   console.log("");
-  console.log(`任务: ${result.task}`);
-  console.log(`可用 Skills: ${result.skillCount}`);
+  console.log(`Task: ${result.task}`);
+  console.log(`Available Skills: ${result.skillCount}`);
   console.log("");
   console.log(result.note);
   console.log("");
 
   if (result.recommended.length === 0) {
-    console.log("推荐: 暂无");
-    console.log("原因: 没有找到明显匹配的 Skill。可以尝试补充更具体的任务描述，或先运行 audit 检查 description。");
+    console.log("Recommended: none");
+    console.log("Reason: no reliable Skill match was found. Try a more specific task or run audit.");
     return;
   }
 
-  console.log("推荐:");
+  console.log("Recommended:");
   for (const item of result.recommended) {
     console.log(`- ${item.skill.name}`);
-    console.log(`  分数: ${item.score}`);
-    console.log(`  原因: ${item.reasons.join(" ")}`);
-    console.log(`  路径: ${item.skill.path}`);
+    console.log(`  score: ${item.score}`);
+    console.log(`  reason: ${item.reasons.join(" ")}`);
+    console.log(`  path: ${item.skill.path}`);
   }
 
   console.log("");
-  console.log("未推荐示例:");
+  console.log("Not recommended examples:");
   for (const item of result.notRecommended) {
-    console.log(`- ${item.skill.name || "(未命名 Skill)"}`);
-    console.log(`  原因: ${item.reasons.join(" ")}`);
+    console.log(`- ${item.skill.name || "(unnamed Skill)"}`);
+    console.log(`  reason: ${item.reasons.join(" ")}`);
   }
 }
 
@@ -452,9 +494,7 @@ function parseEvalArgs(args) {
 }
 
 function printEvalInputError() {
-  console.error(`csr eval 需要一个测试文件路径。
-示例:
-  csr eval ./examples/eval.yml --path ./skills`);
+  console.error("csr eval needs an eval file. Example: csr eval ./examples/eval.yml --path ./examples/skills");
 }
 
 function formatPercent(value) {
@@ -464,13 +504,13 @@ function formatPercent(value) {
 function printEvalResult(result) {
   console.log("Routing Eval");
   console.log("");
-  console.log(`测试总数: ${result.summary.total}`);
+  console.log(`Total cases: ${result.summary.total}`);
   console.log(`strict: ${result.summary.strict}`);
   console.log(`permissive: ${result.summary.permissive}`);
   console.log(`no-match: ${result.summary.noMatch}`);
-  console.log(`完全正确: ${result.summary.complete}`);
-  console.log(`部分正确: ${result.summary.partial}`);
-  console.log(`失败: ${result.summary.failed}`);
+  console.log(`complete: ${result.summary.complete}`);
+  console.log(`partial: ${result.summary.partial}`);
+  console.log(`failed: ${result.summary.failed}`);
   console.log("");
   console.log(`Required Recall: ${formatPercent(result.metrics.requiredRecall)}`);
   console.log(`Exclusion Accuracy: ${formatPercent(result.metrics.exclusionAccuracy)}`);
@@ -479,18 +519,18 @@ function printEvalResult(result) {
   console.log(`No-Match Accuracy: ${formatPercent(result.metrics.noMatchAccuracy)}`);
   console.log(`Average Selected Skills: ${result.metrics.averageSelectedSkills.toFixed(1)}`);
   console.log("");
-  console.log("最常漏掉的 Skill:");
+  console.log("Most missed Skills:");
   if (result.mostMissed.length === 0) {
-    console.log("- 无");
+    console.log("- none");
   } else {
     for (const item of result.mostMissed.slice(0, 5)) {
       console.log(`- ${item.skill}: ${item.count}`);
     }
   }
   console.log("");
-  console.log("最常误触发的 Skill:");
+  console.log("Most over-triggered Skills:");
   if (result.mostOverTriggered.length === 0) {
-    console.log("- 无");
+    console.log("- none");
   } else {
     for (const item of result.mostOverTriggered.slice(0, 5)) {
       console.log(`- ${item.skill}: ${item.count}`);
@@ -499,16 +539,16 @@ function printEvalResult(result) {
   console.log("");
 
   if (result.failedCases.length === 0) {
-    console.log("所有测试都符合预期。");
+    console.log("All cases matched expectations.");
     return;
   }
 
-  console.log("失败或部分正确案例:");
+  console.log("Failed or partial cases:");
   for (const item of result.failedCases.slice(0, 10)) {
     console.log(`- ${item.id || item.prompt}`);
-    console.log(`  状态: ${item.status}`);
-    console.log(`  推荐: ${item.recommended.length > 0 ? item.recommended.join(", ") : "(无)"}`);
-    console.log(`  原因: ${item.failureReasons.join("; ") || "(无)"}`);
+    console.log(`  status: ${item.status}`);
+    console.log(`  recommended: ${item.recommended.length > 0 ? item.recommended.join(", ") : "(none)"}`);
+    console.log(`  reason: ${item.failureReasons.join("; ") || "(none)"}`);
   }
 }
 
@@ -531,10 +571,80 @@ function printThresholdFailures(failures) {
     return;
   }
 
-  console.error("质量门槛未通过:");
+  console.error("Quality gates failed:");
   for (const item of failures) {
-    const directionText = item.direction === "min" ? "至少" : "最多";
-    console.error(`- ${item.label}: ${item.actual.toFixed(3)}，要求${directionText} ${item.value}`);
+    const directionText = item.direction === "min" ? "at least" : "at most";
+    console.error(`- ${item.label}: ${item.actual.toFixed(3)}, expected ${directionText} ${item.value}`);
+  }
+}
+
+function parseBudgetArgs(args) {
+  const paths = [];
+  let json = false;
+  let showPaths = false;
+  let maxRecommendedTokens = 8000;
+  let error = "";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+
+    if (value === "--json") {
+      json = true;
+      continue;
+    }
+
+    if (value === "--show-paths") {
+      showPaths = true;
+      continue;
+    }
+
+    if (value === "--max-tokens") {
+      const nextValue = args[index + 1];
+      const parsedValue = Number(nextValue);
+      if (!nextValue || !Number.isFinite(parsedValue) || parsedValue <= 0) {
+        error = "budget --max-tokens needs a positive number.";
+        continue;
+      }
+
+      maxRecommendedTokens = parsedValue;
+      index += 1;
+      continue;
+    }
+
+    if (value === "--path" || value === "-p") {
+      const nextValue = args[index + 1];
+      if (nextValue) {
+        paths.push(nextValue);
+        index += 1;
+      }
+      continue;
+    }
+
+    paths.push(value);
+  }
+
+  return { paths, json, showPaths, maxRecommendedTokens, error };
+}
+
+function printBudgetResult(result) {
+  console.log("csr budget");
+  console.log("");
+  console.log(result.note);
+  console.log("");
+  console.log(`Skills estimated: ${result.summary.includedSkills}/${result.summary.totalSkills}`);
+  console.log(`Estimated tokens: ${result.summary.estimatedTokens}`);
+  console.log(`Threshold: ${result.summary.maxRecommendedTokens}`);
+  console.log(`Utilization: ${formatPercent(result.summary.utilization)}`);
+  console.log(`Risk: ${result.summary.risk}`);
+  console.log("");
+
+  for (const skill of result.skills) {
+    console.log(`- ${skill.name}`);
+    console.log(`  source: ${skill.source}`);
+    console.log(`  estimated tokens: ${skill.estimatedTokens}`);
+    console.log(`  included: ${skill.included ? "yes" : "no"}`);
+    console.log(`  reason: ${skill.reason}`);
+    console.log(`  path: ${skill.path}`);
   }
 }
 
@@ -543,29 +653,28 @@ function main(argv = process.argv.slice(2)) {
 
   if (!command || command === "-h" || command === "--help") {
     printHelp();
-    return 0;
+    return EXIT.OK;
   }
 
   if (command === "-v" || command === "--version") {
     console.log(version);
-    return 0;
+    return EXIT.OK;
   }
 
   if (!COMMANDS.has(command)) {
-    console.error(`未知命令: ${command}
-
-请运行 "csr --help" 查看可用命令。`);
-    return 1;
+    console.error(`Unknown command: ${command}`);
+    console.error('Run "csr --help" to see available commands.');
+    return EXIT.INPUT_ERROR;
   }
 
   if (hasHelpArg(rest)) {
     printCommandHelp(command);
-    return 0;
+    return EXIT.OK;
   }
 
   if (command === "route" && rest.length === 0) {
     printRouteInputError();
-    return 1;
+    return EXIT.INPUT_ERROR;
   }
 
   if (command === "scan") {
@@ -574,51 +683,51 @@ function main(argv = process.argv.slice(2)) {
     const result = scanArgs.showPaths ? rawResult : hideScanPaths(rawResult);
 
     if (scanArgs.json) {
-      console.log(JSON.stringify(result, null, 2));
-      return 0;
+      printJson("scan", result);
+      return EXIT.OK;
     }
 
     printScanResult(result, { brief: scanArgs.brief });
-    return 0;
+    return EXIT.OK;
   }
 
   if (command === "audit") {
     const auditArgs = parseAuditArgs(rest);
     if (auditArgs.error) {
       console.error(auditArgs.error);
-      return 1;
+      return EXIT.INPUT_ERROR;
     }
 
     const scanResult = scanSkills({ paths: auditArgs.paths });
     const result = auditSkills(auditArgs.showPaths ? scanResult : hideScanPaths(scanResult));
     printAuditResult(filterAuditResult(result, auditArgs.severity), { severity: auditArgs.severity });
-    return 0;
+    return EXIT.OK;
   }
 
   if (command === "route") {
     const routeArgs = parseRouteArgs(rest);
     if (!routeArgs.task) {
       printRouteInputError();
-      return 1;
+      return EXIT.INPUT_ERROR;
     }
 
     const scanResult = scanSkills({ paths: routeArgs.paths });
     const context = loadRouteContext({ skills: scanResult.skills });
     printRouteResult(routeTask(routeArgs.task, routeArgs.showPaths ? scanResult : hideScanPaths(scanResult), { context }));
-    return 0;
+    return EXIT.OK;
   }
 
   if (command === "eval") {
     const evalArgs = parseEvalArgs(rest);
     if (evalArgs.error) {
       console.error(evalArgs.error);
-      return 1;
+      return EXIT.INPUT_ERROR;
     }
 
     const evalFile = evalArgs.rest[0];
     if (!evalFile) {
       printEvalInputError();
-      return 1;
+      return EXIT.INPUT_ERROR;
     }
 
     try {
@@ -630,30 +739,50 @@ function main(argv = process.argv.slice(2)) {
 
       if (evalArgs.output) {
         if (path.resolve(evalArgs.output) === path.resolve(evalFile)) {
-          console.error("eval --output 不能覆盖 Eval 文件本身。");
-          return 1;
+          console.error("eval --output cannot overwrite the eval file itself.");
+          return EXIT.INPUT_ERROR;
         }
 
-        fs.writeFileSync(evalArgs.output, renderMarkdownReport(result, { evalFile }), "utf8");
-        console.error(`已写入 Markdown 报告: ${evalArgs.output}`);
+        fs.writeFileSync(evalArgs.output, renderMarkdownReport(result, { evalFile: redactLocalPaths(evalFile) }), "utf8");
+        console.error("Markdown report written.");
       }
 
       if (evalArgs.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printJson("eval", result);
         printThresholdFailures(thresholdFailures);
-        return thresholdFailures.length === 0 ? 0 : 1;
+        return thresholdFailures.length === 0 ? EXIT.OK : EXIT.QUALITY_GATE_FAILED;
       }
 
       printEvalResult(result);
       printThresholdFailures(thresholdFailures);
-      return thresholdFailures.length === 0 ? 0 : 1;
+      return thresholdFailures.length === 0 ? EXIT.OK : EXIT.QUALITY_GATE_FAILED;
     } catch (error) {
-      console.error(`无法运行 eval: ${error.message}`);
-      return 1;
+      console.error(`Cannot run eval: ${redactLocalPaths(error.message)}`);
+      return EXIT.INPUT_ERROR;
     }
   }
 
-  return 0;
+  if (command === "budget") {
+    const budgetArgs = parseBudgetArgs(rest);
+    if (budgetArgs.error) {
+      console.error(budgetArgs.error);
+      return EXIT.INPUT_ERROR;
+    }
+
+    const rawScanResult = scanSkills({ paths: budgetArgs.paths });
+    const scanResult = budgetArgs.showPaths ? rawScanResult : hideScanPaths(rawScanResult);
+    const result = budgetSkills(scanResult, { maxRecommendedTokens: budgetArgs.maxRecommendedTokens });
+
+    if (budgetArgs.json) {
+      printJson("budget", result);
+      return EXIT.OK;
+    }
+
+    printBudgetResult(result);
+    return EXIT.OK;
+  }
+
+  return EXIT.OK;
 }
 
 if (require.main === module) {
@@ -661,5 +790,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  EXIT,
+  hideScanPaths,
   main,
+  redactLocalPaths,
 };
