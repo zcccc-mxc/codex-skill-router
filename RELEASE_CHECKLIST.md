@@ -54,12 +54,12 @@ Target: `0.1.0-rc.1`
 - [x] Node 20 configured
 - [x] Node 22 configured
 - [x] Remote GitHub Actions passed after push
-  - 2026-06-30: confirmed GitHub Actions run `28381309705` succeeded for Ubuntu, Windows, and macOS on Node 20 and Node 22.
+  - 2026-06-30: confirmed GitHub Actions run `28437605104` succeeded for Ubuntu, Windows, and macOS on Node 20 and Node 22.
 
 ## Release
 
-- [x] npm name availability checked
-  - 2026-06-30: `npm view codex-skill-router` returned 404 and `npm search codex-skill-router --json` showed no exact package name match. Final ownership is still determined by `npm publish`.
+- [x] npm name availability confirmed
+  - Confirmed on 2026-06-30: npm registry returned 404 for `codex-skill-router`. Final availability remains subject to npm publish acceptance.
 - [x] npm login status checked
   - 2026-06-30: `npm whoami` returned `ENEEDAUTH`, so this machine is not logged in to npm.
 - [x] Release notes draft prepared
@@ -70,4 +70,6 @@ Target: `0.1.0-rc.1`
 ## Final Decision
 
 - [x] Ready for `0.1.0-rc.1`
-  - 2026-06-30: release gates are closed for GitHub Prerelease. npm publishing still requires an authenticated npm account.
+  - Release candidate gates verified on 2026-06-30.
+  - The project is ready for GitHub prerelease preparation.
+  - No npm publish, GitHub Release, or Git tag was created during this verification.
