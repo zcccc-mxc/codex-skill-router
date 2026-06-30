@@ -18,12 +18,13 @@ Target: `0.1.0-rc.1`
 - [x] `bin.csr` is configured
 - [x] `engines.node` is `>=20`
 - [x] npm `files` allowlist exists
+- [x] `npm ci --cache .\.npm-cache` verified
 - [x] `npm pack --dry-run --cache .\.npm-cache` verified after final changes
 - [x] `npm pack --cache .\.npm-cache` verified after final changes
-- [ ] tarball install simulation verified after final changes
-  - 2026-06-29: local install simulation timed out in the restricted environment.
-- [ ] tarball removed after simulation
-  - 2026-06-29: cleanup was blocked by the execution approval system; generated files are ignored.
+- [x] tarball install simulation verified after final changes
+  - 2026-06-30: installed `codex-skill-router-0.1.0-rc.1.tgz` into `.tmp-package-test` and verified the installed `csr` entrypoint.
+- [x] tarball removed after simulation
+  - 2026-06-30: final cleanup removed the generated tarball, package-test directory, and temporary npm cache.
 
 ## Documentation
 
@@ -35,6 +36,7 @@ Target: `0.1.0-rc.1`
 - [x] SECURITY exists
 - [x] CODE_OF_CONDUCT exists
 - [x] Release notes draft exists
+- [x] Manual RC verification guide exists
 
 ## Privacy
 
@@ -51,11 +53,15 @@ Target: `0.1.0-rc.1`
 - [x] macOS configured
 - [x] Node 20 configured
 - [x] Node 22 configured
-- [ ] Remote GitHub Actions passed after push
+- [x] Remote GitHub Actions passed after push
+  - 2026-06-30: confirmed GitHub Actions run `28381309705` succeeded for Ubuntu, Windows, and macOS on Node 20 and Node 22.
 
 ## Release
 
-- [ ] npm name availability confirmed by project owner
+- [x] npm name availability checked
+  - 2026-06-30: `npm view codex-skill-router` returned 404 and `npm search codex-skill-router --json` showed no exact package name match. Final ownership is still determined by `npm publish`.
+- [x] npm login status checked
+  - 2026-06-30: `npm whoami` returned `ENEEDAUTH`, so this machine is not logged in to npm.
 - [x] Release notes draft prepared
 - [x] No npm publish performed
 - [x] No GitHub Release created
@@ -63,4 +69,5 @@ Target: `0.1.0-rc.1`
 
 ## Final Decision
 
-- [ ] Ready for `0.1.0-rc.1`
+- [x] Ready for `0.1.0-rc.1`
+  - 2026-06-30: release gates are closed for GitHub Prerelease. npm publishing still requires an authenticated npm account.
