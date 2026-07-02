@@ -76,12 +76,26 @@ Blocks stable release: no.
 
 - [x] `npm test` passes with 21 tests.
 - [x] 2026-07-02 local retest passed with 21 tests.
-- [ ] GitHub Actions passes on Ubuntu Node 20.
-- [ ] GitHub Actions passes on Ubuntu Node 22.
-- [ ] GitHub Actions passes on Windows Node 20.
-- [ ] GitHub Actions passes on Windows Node 22.
-- [ ] GitHub Actions passes on macOS Node 20.
-- [ ] GitHub Actions passes on macOS Node 22.
+- [x] GitHub Actions passes on Ubuntu Node 20.
+- [x] GitHub Actions passes on Ubuntu Node 22.
+- [x] GitHub Actions passes on Windows Node 20.
+- [x] GitHub Actions passes on Windows Node 22.
+- [x] GitHub Actions passes on macOS Node 20.
+- [x] GitHub Actions passes on macOS Node 22.
+
+GitHub Actions evidence:
+
+```text
+2026-07-02:
+Run 28596931478 completed successfully for commit 419413897de20d468967c75372104f9dd6786041.
+Matrix jobs passed:
+- ubuntu-latest / Node 20
+- ubuntu-latest / Node 22
+- windows-latest / Node 20
+- windows-latest / Node 22
+- macos-latest / Node 20
+- macos-latest / Node 22
+```
 
 ## Documentation
 
@@ -103,6 +117,11 @@ The package version has not been changed to 0.1.0 yet, and no npm publish has be
 - [x] Choose stable `v0.1.0`.
 - [ ] Choose `v0.1.0-rc.2`.
 - [x] Decision reason recorded.
+- [x] npm package name rechecked before stable release.
+- [ ] npm login confirmed.
+- [ ] npm publish completed.
+- [ ] Git tag `v0.1.0` created.
+- [ ] GitHub Release `v0.1.0` created.
 
 Decision reason:
 
@@ -129,3 +148,19 @@ Stable package install simulation passed for codex-skill-router@0.1.0.
 ```
 
 Stable `v0.1.0` is appropriate when final release packaging, CI, README, CHANGELOG, and release notes are checked immediately before release.
+
+npm package name evidence:
+
+```text
+2026-07-02:
+`npm view codex-skill-router version` returned 404 Not Found.
+No published package named codex-skill-router was found at the time of this check.
+Final availability remains subject to npm publish acceptance.
+```
+
+Remaining external gate:
+
+```text
+`npm whoami` returned ENEEDAUTH.
+This machine must be logged in to npm before `npm publish` can run.
+```
