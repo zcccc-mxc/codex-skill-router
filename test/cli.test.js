@@ -59,8 +59,8 @@ test("prints top-level and command help", () => {
   }
 });
 
-test("prints rc version", () => {
-  assert.equal(run(["--version"]).trim(), "0.1.0-rc.1");
+test("prints stable version", () => {
+  assert.equal(run(["--version"]).trim(), "0.1.0");
 });
 
 test("default scan roots follow Codex standard locations and legacy compatibility", () => {

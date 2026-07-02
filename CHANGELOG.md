@@ -6,6 +6,37 @@ All notable changes to Codex Skill Router will be documented in this file.
 
 - No unreleased changes yet.
 
+## [0.1.0] - 2026-07-02
+
+### Added
+
+- Added stable release notes draft at `docs/RELEASE_NOTES_0.1.0.md`.
+- Added product vision and roadmap documentation.
+- Added RC1 validation plan, validation log, issue triage, and stable release checklist.
+- Added public-safe real-world validation materials under `validation/`.
+
+### Changed
+
+- Rewrote the English README around a public 60-second tryout, installation paths, privacy promises, and validation status.
+- Rewrote the Chinese README to provide a clear public entry point for Chinese users.
+- Documented the stable `v0.1.0` release decision based on RC1 validation.
+- Updated package metadata from `0.1.0-rc.1` to `0.1.0`.
+
+### Validation
+
+- RC1 validation covered 30 real tasks.
+- 28 of 30 real tasks were complete.
+- 2 of 30 real tasks failed because `docs-authoring` was additionally recommended on web/mobile tasks.
+- Required Skill Recall was 100.0%.
+- No-Match Accuracy was 100.0%.
+- Exclusion Accuracy was 91.7%.
+- Local retest on 2026-07-02 passed `npm.cmd test` with 21 tests.
+
+### Known limitations
+
+- `docs-authoring` may still be over-recommended in a small number of web/mobile tasks.
+- This is tracked as RC1-001, severity P2, and does not block stable `v0.1.0`.
+
 ## [0.1.0-rc.1] - 2026-06-29
 
 ### Added

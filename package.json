@@ -1,6 +1,6 @@
 {
   "name": "codex-skill-router",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0",
   "description": "Local-first tool for checking, testing, and improving Codex Skill routing.",
   "license": "MIT",
   "repository": {

@@ -1,0 +1,306 @@
+version: 1
+
+# Add only reviewed, public-safe real tasks here.
+# Do not commit private paths, customer names, product costs, secrets,
+# screenshots, internal Skill contents, or proprietary business details.
+
+cases:
+  - id: rw-001-skill-inventory
+    prompt: "Check which Skills are available in the current project and whether any are missing."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This is a meta inspection task that should use scan, not route to a specific Skill."
+
+  - id: rw-002-readme-install
+    prompt: "Improve README installation instructions without changing product code."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [docs-authoring]
+      optional: []
+      exclude: [code-refactor]
+    reason: "README installation instructions are documentation-only work."
+
+  - id: rw-003-login-auth-risk
+    prompt: "Check whether a login API has an authorization bypass risk."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [security-review]
+      optional: []
+      exclude: [frontend-ui]
+    reason: "Authorization bypass risk belongs to security review."
+
+  - id: rw-004-screenshot-mobile
+    prompt: "Improve a page from a screenshot and check mobile display."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [browser-validation, frontend-ui]
+      optional: []
+      exclude: [docs-authoring]
+    reason: "The task combines browser/mobile validation and frontend UI work; documentation authoring is not expected."
+
+  - id: rw-005-ambiguous-no-match
+    prompt: "Decide whether an intentionally vague task should return no-match."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "An intentionally vague task should not produce a reliable Skill recommendation."
+
+  - id: rw-006-validation-doc-registration
+    prompt: "Register the decision about insufficient real RC1 validation tasks in the validation documents."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [docs-authoring]
+      optional: []
+      exclude: [browser-validation, security-review, frontend-ui]
+    reason: "This is a documentation and validation-log task. It should route to documentation authoring, not UI, browser, or security work."
+
+  - id: rw-007-release-notes-install
+    prompt: "Improve README installation instructions and release notes for the RC1 launch."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [docs-authoring]
+      optional: [deploy-skill]
+      exclude: [browser-validation]
+    reason: "This is documentation work with release-related notes, so docs-authoring is required and deploy-skill can be a useful secondary recommendation."
+
+  - id: rw-008-ci-release-readiness
+    prompt: "Review the GitHub Actions CI failure context for release readiness."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [github-review]
+      optional: [deploy-skill]
+      exclude: [browser-validation]
+    reason: "This is repository and CI review work. GitHub review is required; deployment context can be secondary."
+
+  - id: rw-009-login-bypass-risk
+    prompt: "Check for authorization bypass risk in the login API."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [security-review]
+      optional: []
+      exclude: [frontend-ui]
+    reason: "Authorization bypass risk belongs to security review."
+
+  - id: rw-010-popup-mobile-ui
+    prompt: "Improve the popup page layout and mobile display for the Chrome extension."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [frontend-ui, browser-validation]
+      optional: []
+      exclude: [docs-authoring]
+    reason: "This is UI and browser/mobile validation work. Documentation authoring is not expected."
+
+  - id: rw-011-browser-popup-check
+    prompt: "Check browser rendering and mobile viewport behavior for the popup."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [browser-validation]
+      optional: [frontend-ui]
+      exclude: [code-refactor]
+    reason: "Browser rendering and viewport behavior belong to browser validation, with frontend UI as a useful secondary recommendation."
+
+  - id: rw-012-release-notes-draft
+    prompt: "Write the RC1 release notes draft for installation steps and known limitations."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: [docs-authoring]
+      exclude: [browser-validation]
+    reason: "This is a release-related writing task. Deployment/release handling is primary and documentation authoring is a useful secondary recommendation."
+
+  - id: rw-013-release-checklist-evidence
+    prompt: "Check the release checklist against tarball install and CI evidence."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is release-readiness evidence review, which routes to deployment/release work."
+
+  - id: rw-014-validation-plan-log
+    prompt: "Review the RC1 validation plan and log for release decision alignment."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is a release-readiness review task."
+
+  - id: rw-015-ci-evidence-record
+    prompt: "Record the GitHub Actions success evidence for the release checklist."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is release evidence recording, which fits deployment/release work."
+
+  - id: rw-016-validation-privacy-no-match
+    prompt: "Audit the RC1 validation log for privacy leaks before sharing publicly."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This route prediction returned no reliable Skill match, so strict no-match is the correct outcome."
+
+  - id: rw-017-tarball-smoke-no-match
+    prompt: "Check the RC1 package tarball install smoke test after packaging."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This route prediction returned no reliable Skill match, so strict no-match is the correct outcome."
+
+  - id: rw-018-tarball-cleanup-no-match
+    prompt: "Confirm the tarball removal and temporary cleanup after packaging tests."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This route prediction returned no reliable Skill match, so strict no-match is the correct outcome."
+
+  - id: rw-019-cli-help-version
+    prompt: "Validate the CLI help and version output before release."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is a release validation task focused on CLI behavior."
+
+  - id: rw-020-npm-pack-output
+    prompt: "Check the npm pack output for the RC1 tarball contents."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is package verification for the release candidate."
+
+  - id: rw-021-release-checklist-post-tests
+    prompt: "Review the release checklist after local tests pass."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is a release-readiness review task."
+
+  - id: rw-022-eval-results-release
+    prompt: "Summarize the RC1 evaluation results for the release decision."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is release decision support based on evaluation results."
+
+  - id: rw-023-privacy-log-no-match
+    prompt: "Record the privacy check in the validation log for public sharing."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This route prediction returned no reliable Skill match, so strict no-match is the correct outcome."
+
+  - id: rw-024-cache-cleanup-no-match
+    prompt: "Confirm the temporary npm cache cleanup after tarball install."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This route prediction returned no reliable Skill match, so strict no-match is the correct outcome."
+
+  - id: rw-025-release-language-review
+    prompt: "Review the release notes and checklist for user-facing language before publishing."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: [docs-authoring]
+      exclude: [browser-validation]
+    reason: "This is release publishing work with supporting documentation."
+
+  - id: rw-026-package-name-check
+    prompt: "Validate the published package name and tarball filename in the release checklist."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is package verification for the release candidate."
+
+  - id: rw-027-readiness-agreement
+    prompt: "Check that the RC1 validation log and plan agree on release readiness."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is a release-readiness alignment check."
+
+  - id: rw-028-ci-packaging-summary
+    prompt: "Summarize the CI and packaging evidence for the final RC1 decision."
+    mode: strict
+    category: real-world
+    expected:
+      include: []
+      optional: []
+      exclude: []
+    reason: "This route prediction returned no reliable Skill match, so strict no-match is the correct outcome."
+
+  - id: rw-029-checklist-version-checks
+    prompt: "Record the cleanup and version checks in the release checklist."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: []
+      exclude: [browser-validation]
+    reason: "This is release checklist maintenance."
+
+  - id: rw-030-public-safe-evidence-audit
+    prompt: "Audit the release checklist and validation log for any missing public-safe evidence."
+    mode: permissive
+    category: real-world
+    expected:
+      include: [deploy-skill]
+      optional: [browser-validation]
+      exclude: [code-refactor]
+    reason: "This is release evidence review."
