@@ -19,7 +19,7 @@
     "local-first"
   ],
   "bin": {
-    "csr": "./src/cli.js"
+    "csr": "src/cli.js"
   },
   "files": [
     "src",
