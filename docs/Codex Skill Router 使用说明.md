@@ -1,6 +1,6 @@
 # Codex Skill Router 使用说明
 
-适用版本：`0.1.0-rc.1`
+适用版本：`0.1.0`
 
 ## 一句话理解
 
@@ -15,6 +15,18 @@ Codex Skill Router 不控制 Codex 内部一定调用哪个 Skill。
 - 粗略估算 Skill 元数据预算。
 
 ## 快速试用
+
+如果已经从 npm 全局安装：
+
+```powershell
+csr scan --path .\examples\skills
+csr audit --path .\examples\skills
+csr route "优化现有页面并检查移动端显示" --path .\examples\skills
+csr eval .\examples\eval.yml --path .\examples\skills
+csr budget --path .\examples\skills
+```
+
+如果是在仓库源码目录中运行：
 
 ```powershell
 node src\cli.js scan --path .\examples\skills
@@ -39,7 +51,7 @@ node src\cli.js budget --path .\examples\skills
 node src\cli.js route "优化现有页面并检查移动端显示" --path .\examples\skills
 ```
 
-如果已经 `npm link`：
+如果已经全局安装或 `npm link`：
 
 ```powershell
 csr route "优化现有页面并检查移动端显示" --path .\examples\skills

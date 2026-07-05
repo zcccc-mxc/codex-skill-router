@@ -38,7 +38,7 @@ Local-first by default:
 
 ## Install
 
-After the package is published to npm:
+Install from npm:
 
 ```bash
 npm install -g codex-skill-router
