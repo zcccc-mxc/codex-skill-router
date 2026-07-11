@@ -1,7 +1,7 @@
 {
   "name": "codex-skill-router",
   "version": "0.1.0",
-  "description": "Local-first tool for checking, testing, and improving Codex Skill routing.",
+  "description": "Local-first CLI to scan, audit, route, evaluate, and budget Codex Skills.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,9 +13,15 @@
   "homepage": "https://github.com/zcccc-mxc/codex-skill-router#readme",
   "keywords": [
     "codex",
+    "codex-skills",
+    "openai-codex",
+    "agent-skills",
     "skills",
     "routing",
+    "skill-routing",
+    "skill-audit",
     "cli",
+    "developer-tools",
     "local-first"
   ],
   "bin": {
