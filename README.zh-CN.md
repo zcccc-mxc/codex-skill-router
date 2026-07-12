@@ -2,6 +2,8 @@
 
 [English README](README.md)
 
+> 在本地扫描、审计、路由和测试 Codex Skills，不需要 API Key，也不会上传 Skill 内容。
+
 Codex Skill Router 是一个本地优先的命令行工具，用来检查 Codex Skill 是否能被发现、描述是否清楚、路由结果是否符合预期。
 
 它适合维护多个 Codex Skills 的用户，用来做：
@@ -15,6 +17,17 @@ Codex Skill Router 是一个本地优先的命令行工具，用来检查 Codex 
 ```
 
 Codex 本身已经有自己的 Skill 选择机制。本项目不替代 Codex，也不控制 Codex 内部决策。它提供的是本地、可解释的 Skill 质量检查。
+
+## 30 秒试用
+
+```bash
+npm install -g codex-skill-router
+csr scan
+csr audit
+csr route "检查登录接口是否存在权限绕过"
+```
+
+`csr scan` 用来查看本地 Skills，`csr audit` 用来发现元数据问题，`csr route` 用来给出可解释的本地路由预测。默认不会显示本地路径。
 
 ## 当前状态
 

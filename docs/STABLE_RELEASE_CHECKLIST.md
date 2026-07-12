@@ -108,8 +108,8 @@ Matrix jobs passed:
 Documentation note:
 
 ```text
-The README and README.zh-CN describe the npm install command as available after publication.
-The package version has not been changed to 0.1.0 yet, and no npm publish has been performed.
+The README and README.zh-CN describe the npm install command as available from npm.
+The package version is 0.1.0, and codex-skill-router@0.1.0 has been published to npm.
 ```
 
 ## Release Decision
@@ -118,8 +118,8 @@ The package version has not been changed to 0.1.0 yet, and no npm publish has be
 - [ ] Choose `v0.1.0-rc.2`.
 - [x] Decision reason recorded.
 - [x] npm package name rechecked before stable release.
-- [ ] npm login confirmed.
-- [ ] npm publish completed.
+- [x] npm login confirmed.
+- [x] npm publish completed.
 - [ ] Git tag `v0.1.0` created.
 - [ ] GitHub Release `v0.1.0` created.
 
@@ -156,6 +156,10 @@ npm package name evidence:
 `npm view codex-skill-router version` returned 404 Not Found.
 No published package named codex-skill-router was found at the time of this check.
 Final availability remains subject to npm publish acceptance.
+
+2026-07-08:
+`npm view codex-skill-router version` returned 0.1.0.
+The npm package codex-skill-router is published, and the README npm install command is currently valid.
 ```
 
 Remaining external gate:

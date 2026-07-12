@@ -2,6 +2,8 @@
 
 [中文说明](README.zh-CN.md)
 
+> Scan, audit, route, and test Codex Skills locally, without API keys or uploading Skill content.
+
 Codex Skill Router is a local-first CLI for checking whether Codex Skills are discoverable, clearly described, and likely to route to the right task.
 
 It is built for people who maintain multiple Codex Skills and want a simple way to inspect, audit, predict, test, and explain local Skill routing behavior.
@@ -15,6 +17,17 @@ estimate local Skill metadata budget
 ```
 
 Codex already has its own Skill selection behavior. This project does **not** replace Codex, control Codex internals, or claim to know exactly what Codex will invoke. It provides a local, explainable quality check around your Skills.
+
+## Try It In 30 Seconds
+
+```bash
+npm install -g codex-skill-router
+csr scan
+csr audit
+csr route "check login authorization bypass"
+```
+
+Use `csr scan` to inventory local Skills, `csr audit` to find metadata issues, and `csr route` to get an explainable local routing prediction. Paths stay hidden by default.
 
 ## Current Status
 

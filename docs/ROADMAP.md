@@ -28,6 +28,7 @@ Goal: prepare safer execution before work starts.
 
 Planned direction:
 
+- add machine-readable `csr route --json` output for downstream tooling;
 - summarize the intended task plan;
 - identify likely file, network, Git, package, and publish actions;
 - label permission risk levels;
