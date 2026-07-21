@@ -25,13 +25,22 @@ npm install -g codex-skill-router
 csr scan
 csr audit
 csr route "check login authorization bypass"
+csr route "check login authorization bypass" --json
+csr plan "optimize an existing page and verify mobile layout"
 ```
 
 Use `csr scan` to inventory local Skills, `csr audit` to find metadata issues, and `csr route` to get an explainable local routing prediction. Paths stay hidden by default.
 
 ## Current Status
 
-Version: `0.1.0`
+Current prerelease: `0.2.0-rc.1`
+
+Stable release: `0.1.0`
+
+Published:
+
+- npm: [`codex-skill-router@0.1.0`](https://www.npmjs.com/package/codex-skill-router)
+- GitHub Release: [`v0.1.0`](https://github.com/zcccc-mxc/codex-skill-router/releases/tag/v0.1.0)
 
 Implemented commands:
 
@@ -40,6 +49,7 @@ Implemented commands:
 - `csr route`
 - `csr eval`
 - `csr budget`
+- `csr plan`
 
 Local-first by default:
 
@@ -51,11 +61,19 @@ Local-first by default:
 
 ## Install
 
-Install from npm:
+Install the published npm package:
 
 ```bash
 npm install -g codex-skill-router
 csr --help
+```
+
+To test the v0.2 release candidate without changing the stable `latest` install:
+
+```bash
+npm install -g codex-skill-router@next
+# or
+npm install -g codex-skill-router@0.2.0-rc.1
 ```
 
 Current local development install:
@@ -153,6 +171,7 @@ Predict which Skills may fit a task and explain why.
 ```bash
 csr route "check login authorization bypass" --path ./examples/skills
 csr route "only update README installation instructions" --path ./examples/skills
+csr route "check login authorization bypass" --json --path ./examples/skills
 ```
 
 Routing uses local rule-based evidence:
@@ -167,6 +186,8 @@ Routing uses local rule-based evidence:
 - project/user/source priority.
 
 This is a local prediction, not Codex internal execution.
+
+`--json` returns one machine-readable JSON object for local tools. Paths remain hidden by default, and a no-match result is still successful. This output is a local routing prediction, not a record of Codex Skill invocation.
 
 ### `csr eval`
 
@@ -210,6 +231,20 @@ csr budget --path ./examples/skills
 csr budget --json --path ./examples/skills
 csr budget --max-tokens 12000 --path ./examples/skills
 ```
+
+### `csr plan`
+
+Combine a local routing prediction with rough local Skill metadata budget estimates before work starts.
+
+```bash
+csr plan "optimize an existing page and verify mobile layout"
+csr plan "optimize an existing page and verify mobile layout" --json
+csr plan "check login authorization bypass" --path ./examples/skills
+```
+
+`csr plan` reports routing, metadata estimates, predicted actions, permission reminders, acceptance criteria, and an Agent Strategy recommendation. The strategy suggests single, parallel, or sequential roles only; it never creates agents, worktrees, branches, or execution. Parallel work may save elapsed time but can increase Token use and file-conflict risk.
+
+The v0.2 release candidate adds planning, permission analysis, acceptance criteria, and Agent Strategy. It does not execute user tasks.
 
 ## Local Route Context
 

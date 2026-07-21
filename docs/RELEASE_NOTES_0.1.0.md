@@ -1,6 +1,7 @@
 # Release Notes: 0.1.0
 
-Date: 2026-07-02
+Published to npm: 2026-07-03
+GitHub Release published: 2026-07-12
 
 Codex Skill Router `v0.1.0` is the first stable release of the local Skill routing quality checker for Codex.
 
@@ -18,12 +19,20 @@ It answers practical questions:
 
 ## Install
 
-After npm publication:
+Install the published npm package:
 
 ```bash
 npm install -g codex-skill-router
 csr --help
 ```
+
+## Release Status
+
+`v0.1.0` is published on npm as `codex-skill-router@0.1.0`.
+The matching Git tag and GitHub Release are available at:
+
+- https://www.npmjs.com/package/codex-skill-router
+- https://github.com/zcccc-mxc/codex-skill-router/releases/tag/v0.1.0
 
 Repository install:
 

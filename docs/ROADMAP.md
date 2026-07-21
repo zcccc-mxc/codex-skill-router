@@ -26,10 +26,17 @@ Current commands:
 
 Goal: prepare safer execution before work starts.
 
+Status: `v0.2.0-rc.1` candidate prepared for human review; it is not yet published.
+
 Planned direction:
 
 - add machine-readable `csr route --json` output for downstream tooling;
 - summarize the intended task plan;
+- P2 foundation: combine local routing with all-Skill and recommended-Skill metadata budget estimates;
+- P3: add local task-text permission-risk predictions and confirmation recommendations without execution or enforcement;
+- P4: add pre-execution acceptance criteria and suggested verification methods without running verification;
+- P5: add local Agent Strategy recommendations without creating or controlling agents;
+- P6: validate v0.2 planning output and release readiness without adding product features;
 - identify likely file, network, Git, package, and publish actions;
 - label permission risk levels;
 - ask for clearer human confirmation before high-risk actions;
