@@ -1,6 +1,6 @@
 {
   "name": "codex-skill-router",
-  "version": "0.1.0",
+  "version": "0.2.0-rc.1",
   "description": "Local-first CLI to scan, audit, route, evaluate, and budget Codex Skills.",
   "license": "MIT",
   "repository": {
@@ -42,7 +42,8 @@
   ],
   "scripts": {
     "start": "node src/cli.js",
-    "test": "node --test"
+    "test": "node --test",
+    "validate:v0.2": "node scripts/validate-v0.2.js"
   },
   "engines": {
     "node": ">=20"

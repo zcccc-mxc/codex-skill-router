@@ -7,7 +7,8 @@ const { auditSkills } = require("./audit");
 const { budgetSkills } = require("./budget");
 const { loadRouteContext } = require("./context");
 const { evaluateRoutes, loadEvalCases, renderMarkdownReport } = require("./evaluate");
-const { routeTask } = require("./route");
+const { buildTaskPlan } = require("./plan");
+const { routeTask, serializeRouteResult } = require("./route");
 const { scanSkills } = require("./scan");
 
 const EXIT = {
@@ -17,7 +18,7 @@ const EXIT = {
   QUALITY_GATE_FAILED: 3,
 };
 
-const COMMANDS = new Set(["scan", "audit", "route", "eval", "budget"]);
+const COMMANDS = new Set(["scan", "audit", "route", "eval", "budget", "plan"]);
 const AUDIT_SEVERITIES = new Set(["error", "warning", "info"]);
 const EVAL_THRESHOLDS = {
   "--min-complete-rate": { key: "completeCaseRate", direction: "min", label: "Complete Case Rate" },
@@ -40,6 +41,7 @@ Commands:
   route    Predict suitable Skills for a task.
   eval     Evaluate routing quality with test cases.
   budget   Estimate local Skill metadata budget.
+  plan     Combine local routing and metadata budget estimates.
 
 Options:
   -h, --help     Show help.
@@ -81,6 +83,7 @@ Usage:
   csr route "task description" --path <path>
 
 Options:
+  --json        Output machine-readable JSON.
   --show-paths  Show local paths; hidden by default.`,
     eval: `csr eval
 
@@ -107,6 +110,17 @@ Options:
   --json                 Output JSON.
   --show-paths           Show local paths; hidden by default.
   --max-tokens <number>  Set estimate threshold. Default: 8000.`,
+    plan: `csr plan
+
+Usage:
+  csr plan "task description"
+  csr plan "task description" --path <path>
+
+Options:
+  --json                 Output machine-readable JSON.
+  --path, -p <path>      Use an explicit Skill directory.
+  --max-tokens <number>  Set the estimated metadata budget threshold.
+  --show-paths           Show local paths; hidden by default.`,
   };
 
   console.log(helpText[command]);
@@ -367,10 +381,16 @@ function printAuditResult(result, options = {}) {
 function parseRouteArgs(args) {
   const paths = [];
   const taskParts = [];
+  let json = false;
   let showPaths = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
+
+    if (value === "--json") {
+      json = true;
+      continue;
+    }
 
     if (value === "--show-paths") {
       showPaths = true;
@@ -392,12 +412,177 @@ function parseRouteArgs(args) {
   return {
     task: taskParts.join(" ").trim(),
     paths,
+    json,
     showPaths,
   };
 }
 
 function printRouteInputError() {
   console.error('csr route needs a task description. Example: csr route "optimize frontend mobile layout"');
+}
+
+function printRouteJsonInputError() {
+  printJson("route", { summary: {}, data: {} }, {
+    success: false,
+    errors: [{
+      code: "MISSING_TASK",
+      message: "A task description is required.",
+    }],
+  });
+}
+
+function printRouteJsonRuntimeError(error) {
+  printJson("route", { summary: {}, data: {} }, {
+    success: false,
+    errors: [{
+      code: "ROUTE_RUNTIME_ERROR",
+      message: redactLocalPaths(error.message || "Cannot run route."),
+    }],
+  });
+}
+
+function parsePlanArgs(args) {
+  const paths = [];
+  const taskParts = [];
+  let json = false;
+  let showPaths = false;
+  let maxTokens = 8000;
+  let error = "";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+
+    if (value === "--json") {
+      json = true;
+      continue;
+    }
+
+    if (value === "--show-paths") {
+      showPaths = true;
+      continue;
+    }
+
+    if (value === "--max-tokens") {
+      const nextValue = args[index + 1];
+      const parsedValue = Number(nextValue);
+      if (!nextValue || nextValue.startsWith("-") || !Number.isFinite(parsedValue) || parsedValue <= 0) {
+        error = "plan --max-tokens needs a positive number.";
+        continue;
+      }
+
+      maxTokens = parsedValue;
+      index += 1;
+      continue;
+    }
+
+    if (value === "--path" || value === "-p") {
+      const nextValue = args[index + 1];
+      if (!nextValue || nextValue.startsWith("-")) {
+        error = "plan --path needs a Skill directory.";
+        continue;
+      }
+
+      paths.push(nextValue);
+      index += 1;
+      continue;
+    }
+
+    taskParts.push(value);
+  }
+
+  return {
+    task: taskParts.join(" ").trim(),
+    paths,
+    json,
+    showPaths,
+    maxTokens,
+    error,
+  };
+}
+
+function printPlanJsonError(code, message) {
+  printJson("plan", { summary: {}, data: {} }, {
+    success: false,
+    errors: [{ code, message }],
+  });
+}
+
+function printPlanInputError(message) {
+  console.error(message);
+}
+
+function printPlanResult(result) {
+  console.log("Task Plan");
+  console.log("");
+  console.log("Task:");
+  console.log(result.data.task);
+  console.log("");
+  console.log("Recommended Skills:");
+  if (result.data.recommendedSkills.length === 0) {
+    console.log("No reliable recommendation found.");
+  } else {
+    result.data.recommendedSkills.forEach((skill, index) => console.log(`${index + 1}. ${skill.name}`));
+  }
+  console.log("");
+  console.log("Routing:");
+  console.log(`- ${result.summary.skillCount} Skills inspected`);
+  console.log(`- ${result.summary.recommendedCount} Skills recommended`);
+  console.log("- This is a local prediction, not Codex actual invocation");
+  console.log("");
+  console.log("Token Estimate:");
+  console.log(`- All available Skill metadata: ${result.summary.allSkillsEstimatedTokens} estimated tokens`);
+  console.log(`- Recommended Skill metadata: ${result.summary.recommendedSkillsEstimatedTokens} estimated tokens`);
+  console.log(`- Threshold: ${result.summary.maxTokens}`);
+  console.log(`- Budget status: ${result.summary.overBudget ? "over limit" : "within limit"}`);
+  console.log("");
+  console.log("Expected Actions:");
+  if (result.data.expectedActions.length === 0) {
+    console.log("- No specific action can be predicted from this task text.");
+  } else {
+    result.data.expectedActions.forEach((action) => console.log(`- ${action.status}: ${action.description}`));
+  }
+  console.log("");
+  console.log("Permission Risks:");
+  if (result.data.permissionRisks.length === 0) {
+    console.log("- No specific permission risk can be predicted.");
+  } else {
+    result.data.permissionRisks.forEach((permission) => console.log(`- ${permission.type}: ${permission.risk} (${permission.status}) — ${permission.reason}`));
+  }
+  console.log("");
+  console.log("Required Confirmations:");
+  if (result.data.requiredConfirmations.length === 0) {
+    console.log("- None");
+  } else {
+    result.data.requiredConfirmations.forEach((confirmation) => console.log(`- ${confirmation.message}`));
+  }
+  console.log("");
+  console.log("Acceptance Criteria:");
+  if (result.data.acceptanceCriteria.length === 0) {
+    console.log("- No detailed criteria could be generated from the task text.");
+  } else {
+    result.data.acceptanceCriteria.forEach((criterion, index) => {
+      console.log(`${index + 1}. ${criterion.statement}`);
+      console.log(`   Verification: ${criterion.verificationMethod}`);
+    });
+  }
+  console.log("");
+  console.log("Agent Strategy:");
+  const strategy = result.data.agentStrategy;
+  console.log(`- Recommended mode: ${strategy.mode}`);
+  console.log(`- Delegation: ${strategy.recommendDelegation ? "recommended" : "not recommended"}`);
+  console.log(`- Confidence: ${strategy.confidence}`);
+  strategy.suggestedAgents.forEach((agent, index) => {
+    console.log(`${index + 1}. ${agent.role}`);
+    console.log(`   Objective: ${agent.objective}`);
+    console.log(`   Skills: ${agent.skills.length ? agent.skills.join(", ") : "none"}`);
+    console.log(`   Depends on: ${agent.dependsOn.length ? agent.dependsOn.join(", ") : "None"}`);
+  });
+  console.log("");
+  console.log("Warnings:");
+  result.warnings.forEach((warning) => console.log(`- ${warning}`));
+  console.log("");
+  console.log("Unknowns:");
+  result.data.unknowns.forEach((unknown) => console.log(`- ${unknown}`));
 }
 
 function printRouteResult(result) {
@@ -672,11 +857,6 @@ function main(argv = process.argv.slice(2)) {
     return EXIT.OK;
   }
 
-  if (command === "route" && rest.length === 0) {
-    printRouteInputError();
-    return EXIT.INPUT_ERROR;
-  }
-
   if (command === "scan") {
     const scanArgs = parseScanArgs(rest);
     const rawResult = scanSkills({ paths: scanArgs.paths });
@@ -707,14 +887,86 @@ function main(argv = process.argv.slice(2)) {
   if (command === "route") {
     const routeArgs = parseRouteArgs(rest);
     if (!routeArgs.task) {
+      if (routeArgs.json) {
+        printRouteJsonInputError();
+        return EXIT.INPUT_ERROR;
+      }
+
       printRouteInputError();
       return EXIT.INPUT_ERROR;
     }
 
-    const scanResult = scanSkills({ paths: routeArgs.paths });
-    const context = loadRouteContext({ skills: scanResult.skills });
-    printRouteResult(routeTask(routeArgs.task, routeArgs.showPaths ? scanResult : hideScanPaths(scanResult), { context }));
-    return EXIT.OK;
+    try {
+      const scanResult = scanSkills({ paths: routeArgs.paths });
+      const context = loadRouteContext({ skills: scanResult.skills });
+      const routeResult = routeTask(routeArgs.task, routeArgs.showPaths ? scanResult : hideScanPaths(scanResult), { context });
+
+      if (routeArgs.json) {
+        printJson("route", serializeRouteResult(routeResult));
+        return EXIT.OK;
+      }
+
+      printRouteResult(routeResult);
+      return EXIT.OK;
+    } catch (error) {
+      if (routeArgs.json) {
+        printRouteJsonRuntimeError(error);
+      } else {
+        console.error(`Cannot run route: ${redactLocalPaths(error.message)}`);
+      }
+      return EXIT.RUNTIME_ERROR;
+    }
+  }
+
+  if (command === "plan") {
+    const planArgs = parsePlanArgs(rest);
+    const errorCode = !planArgs.task ? "MISSING_TASK" : planArgs.error ? "INVALID_ARGUMENT" : "";
+    const errorMessage = !planArgs.task ? "A task description is required." : planArgs.error;
+
+    if (errorCode) {
+      if (planArgs.json) {
+        printPlanJsonError(errorCode, errorMessage);
+      } else {
+        printPlanInputError(errorMessage || 'csr plan needs a task description. Example: csr plan "optimize frontend mobile layout"');
+      }
+      return EXIT.INPUT_ERROR;
+    }
+
+    try {
+      for (const inputPath of planArgs.paths) {
+        const resolvedPath = path.resolve(inputPath);
+        if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isDirectory()) {
+          const message = `plan --path is not a readable Skill directory: ${redactLocalPaths(inputPath)}`;
+          if (planArgs.json) {
+            printPlanJsonError("INVALID_SKILL_PATH", message);
+          } else {
+            printPlanInputError(message);
+          }
+          return EXIT.INPUT_ERROR;
+        }
+      }
+
+      const rawScanResult = scanSkills({ paths: planArgs.paths });
+      const context = loadRouteContext({ skills: rawScanResult.skills });
+      const scanResult = planArgs.showPaths ? rawScanResult : hideScanPaths(rawScanResult);
+      const result = buildTaskPlan(planArgs.task, scanResult, { context, maxTokens: planArgs.maxTokens });
+
+      if (planArgs.json) {
+        printJson("plan", result, { warnings: result.warnings });
+        return EXIT.OK;
+      }
+
+      printPlanResult(result);
+      return EXIT.OK;
+    } catch (error) {
+      const message = redactLocalPaths(error.message || "Cannot build plan.");
+      if (planArgs.json) {
+        printPlanJsonError("PLAN_RUNTIME_ERROR", message);
+      } else {
+        printPlanInputError(`Cannot build plan: ${message}`);
+      }
+      return EXIT.RUNTIME_ERROR;
+    }
   }
 
   if (command === "eval") {

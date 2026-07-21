@@ -302,9 +302,41 @@ function routeTask(task, scanResult, options = {}) {
   };
 }
 
+function serializeRouteResult(result) {
+  function serializeSkill(item) {
+    return {
+      name: item.skill.name,
+      score: item.score,
+      source: item.skill.source,
+      status: item.skill.status,
+      path: item.skill.path,
+      matchedTerms: item.matchedTerms,
+      reasons: item.reasons,
+      scoreDetails: item.scoreDetails,
+    };
+  }
+
+  return {
+    summary: {
+      skillCount: result.skillCount,
+      recommendedCount: result.recommended.length,
+      notRecommendedCount: result.notRecommended.length,
+      noMatch: result.recommended.length === 0,
+      smallTaskSuppressed: result.suppressSmallTask,
+    },
+    data: {
+      task: result.task,
+      recommendedSkills: result.recommended.map(serializeSkill),
+      notRecommendedSkills: result.notRecommended.map(serializeSkill),
+      contextSummary: result.contextSummary,
+    },
+  };
+}
+
 module.exports = {
   isSmallLocalTask,
   routeTask,
   scoreSkill,
+  serializeRouteResult,
   sourcePriority,
 };

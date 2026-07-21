@@ -120,8 +120,8 @@ The package version is 0.1.0, and codex-skill-router@0.1.0 has been published to
 - [x] npm package name rechecked before stable release.
 - [x] npm login confirmed.
 - [x] npm publish completed.
-- [ ] Git tag `v0.1.0` created.
-- [ ] GitHub Release `v0.1.0` created.
+- [x] Git tag `v0.1.0` created.
+- [x] GitHub Release `v0.1.0` created.
 
 Decision reason:
 
@@ -162,9 +162,15 @@ Final availability remains subject to npm publish acceptance.
 The npm package codex-skill-router is published, and the README npm install command is currently valid.
 ```
 
-Remaining external gate:
+Post-release verification:
 
 ```text
-`npm whoami` returned ENEEDAUTH.
-This machine must be logged in to npm before `npm publish` can run.
+2026-07-13:
+`npm view codex-skill-router@0.1.0` returned the published version and tarball.
+The repository contains Git tag v0.1.0.
+GitHub Release v0.1.0 is published at:
+https://github.com/zcccc-mxc/codex-skill-router/releases/tag/v0.1.0
+
+The historical `npm whoami` ENEEDAUTH result was a pre-publication login check.
+It is no longer an active release gate because npm publication completed successfully.
 ```

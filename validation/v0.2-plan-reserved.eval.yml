@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "reserved": [
+    {"id":"P6-R-01","task":"Fix a spelling error in a guide."}, {"id":"P6-R-02","task":"Review authorization middleware without edits."}, {"id":"P6-R-03","task":"Install a test dependency."}, {"id":"P6-R-04","task":"Push a prepared commit to a remote."},
+    {"id":"P6-R-05","task":"Publish a package to npm."}, {"id":"P6-R-06","task":"Delete all temporary output files recursively."}, {"id":"P6-R-07","task":"Share a secret token publicly."}, {"id":"P6-R-08","task":"Update files outside the workspace."},
+    {"id":"P6-R-09","task":"Implement UI then test it."}, {"id":"P6-R-10","task":"Independently review accessibility and authentication."}, {"id":"P6-R-11","task":"让项目更好。"}, {"id":"P6-R-12","task":"只更新文档，不要联网。"}
+  ]
+}

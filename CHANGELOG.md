@@ -4,9 +4,40 @@ All notable changes to Codex Skill Router will be documented in this file.
 
 ## [Unreleased]
 
-- No unreleased changes yet.
+## [0.2.0-rc.1] - 2026-07-20
 
-## [0.1.0] - 2026-07-02
+### Added
+
+- Added machine-readable JSON output for `csr route`.
+- Added the initial `csr plan` command combining local Skill routing and metadata budget estimates.
+- Added local permission-risk analysis and confirmation recommendations to `csr plan`.
+- Added pre-execution acceptance criteria and suggested verification methods to `csr plan`.
+- Added local Agent Strategy recommendations for single, parallel, and sequential task delegation.
+- Added a public-safe v0.2 validation suite covering plan, permission risk, acceptance criteria, and Agent Strategy.
+
+### Changed
+
+- Kept route and plan JSON output versioned, private by default, and compatible with existing text commands.
+- Kept all planning output local and predictive; it does not record or control Codex execution.
+
+### Validation
+
+- `npm test` passes 34 automated tests.
+- The v0.2 primary validation suite has 47 complete cases and 1 recorded P2 failure; the reserved suite has 12 complete cases.
+- The existing 30-case route Eval remains 28 complete and 2 known P2 failures, with no regression in its reported metrics.
+
+### Security
+
+- Paths remain hidden by default in text and JSON output.
+- `csr plan` provides reminders and confirmation suggestions only; it does not execute commands, create agents, install packages, publish packages, or create Releases.
+
+### Known limitations
+
+- Task-text interpretation is heuristic. Some explicit negative wording such as `without publishing`, `不要访问网络`, or `不要 push` can be misread; review predicted actions before acting.
+- `docs-authoring` may still be over-recommended for a small number of web/mobile routing tasks.
+- Token values are rough local metadata estimates, not actual Codex Token use.
+
+## [0.1.0] - 2026-07-03
 
 ### Added
 
@@ -94,7 +125,3 @@ All notable changes to Codex Skill Router will be documented in this file.
 - `budget` is a rough estimate, not real token accounting.
 - The tool does not automatically rewrite user Skills.
 - The tool does not connect to external AI services.
-
-## v0.1.0
-
-Planned first stable release after release-candidate validation.
